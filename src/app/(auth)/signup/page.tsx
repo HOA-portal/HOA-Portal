@@ -31,52 +31,38 @@ export default function SignupPage() {
     setError(null)
     setLoading(true)
 
-    const supabase = createClient()
+    const res = await fetch('/api/auth/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: form.email,
+        password: form.password,
+        fullName: form.fullName,
+        unitNumber: form.unitNumber,
+        phone: form.phone,
+        hoaSubdomain: form.hoaSubdomain,
+      }),
+    })
 
-    // Resolve HOA from subdomain
-    const { data: hoa, error: hoaError } = await supabase
-      .from('hoas')
-      .select('id')
-      .eq('subdomain', form.hoaSubdomain.toLowerCase().trim())
-      .single() as { data: { id: string } | null; error: unknown }
+    const body = await res.json()
 
-    if (hoaError || !hoa) {
-      setError('Community not found. Check the community code and try again.')
+    if (!res.ok) {
+      setError(body.error ?? 'Sign up failed. Please try again.')
       setLoading(false)
       return
     }
 
-    // Create auth user
-    const { data: authData, error: signUpError } = await supabase.auth.signUp({
+    // Sign in after account is created
+    const supabase = createClient()
+    const { error: signInError } = await supabase.auth.signInWithPassword({
       email: form.email,
       password: form.password,
-      options: {
-        data: {
-          full_name: form.fullName,
-          hoa_id: hoa.id,
-        },
-      },
     })
 
-    if (signUpError || !authData.user) {
-      setError(signUpError?.message ?? 'Sign up failed. Please try again.')
+    if (signInError) {
+      setError('Account created! Please sign in.')
       setLoading(false)
-      return
-    }
-
-    // Create profile row
-    const { error: profileError } = await supabase.from('profiles').insert({
-      id: authData.user.id,
-      hoa_id: hoa.id,
-      role: 'resident',
-      full_name: form.fullName || null,
-      unit_number: form.unitNumber || null,
-      phone: form.phone || null,
-    })
-
-    if (profileError) {
-      setError('Account created but profile setup failed. Please contact support.')
-      setLoading(false)
+      router.push('/login')
       return
     }
 
