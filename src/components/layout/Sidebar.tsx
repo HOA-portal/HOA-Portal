@@ -66,7 +66,9 @@ export default function Sidebar({ profile, hoaName }: SidebarProps) {
       <nav className="flex-1 px-3 py-3 space-y-0.5">
         {navItems.map((item) => {
           const Icon = item.icon
-          const active = pathname === item.href || pathname.startsWith(item.href + '/')
+          const active = item.href === '/admin'
+            ? pathname === '/admin'
+            : pathname === item.href || pathname.startsWith(item.href + '/')
           return (
             <Link
               key={item.href}

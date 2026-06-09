@@ -102,3 +102,8 @@ Local Supabase dashboard: http://localhost:54323
 - Do not store secrets in `.env` committed to git — use `.env.local`
 - Do not use `supabase.auth.getSession()` on the server — always use `supabase.auth.getUser()` (verifies with Supabase server)
 - Do not create new UI components from scratch when shadcn/ui has an equivalent
+
+<!-- SPECKIT START -->
+For additional context about technologies to be used, project structure,
+shell commands, and other important information, read the current plan
+<!-- SPECKIT END -->

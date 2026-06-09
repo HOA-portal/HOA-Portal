@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Wrench, ClipboardList, ShieldAlert, Megaphone } from 'lucide-react'
 import Link from 'next/link'
 import type { Profile } from '@/types/database'
+import { StatusBadge } from '@/components/admin/StatusBadge'
 
 export default async function AdminDashboardPage() {
   const supabase = await createClient()
@@ -154,8 +155,8 @@ export default async function AdminDashboardPage() {
                         </p>
                       </div>
                       <div className="flex gap-1.5 shrink-0">
-                        <StatusBadge value={wo.priority} type="priority" />
-                        <StatusBadge value={wo.status} type="status" />
+                        <StatusBadge value={wo.priority} />
+                        <StatusBadge value={wo.status} />
                       </div>
                     </div>
                   ))}
@@ -181,7 +182,7 @@ export default async function AdminDashboardPage() {
                           {c.category} · {new Date(c.created_at).toLocaleDateString()}
                         </p>
                       </div>
-                      <StatusBadge value={c.status} type="status" />
+                      <StatusBadge value={c.status} />
                     </div>
                   ))}
                 </div>
@@ -191,26 +192,6 @@ export default async function AdminDashboardPage() {
         </div>
       </div>
     </div>
-  )
-}
-
-function StatusBadge({ value, type }: { value: string; type: 'status' | 'priority' }) {
-  const colors: Record<string, string> = {
-    open: 'bg-blue-100 text-blue-700',
-    in_progress: 'bg-amber-100 text-amber-700',
-    resolved: 'bg-green-100 text-green-700',
-    closed: 'bg-slate-100 text-slate-600',
-    under_review: 'bg-purple-100 text-purple-700',
-    low: 'bg-slate-100 text-slate-600',
-    medium: 'bg-blue-100 text-blue-700',
-    high: 'bg-amber-100 text-amber-700',
-    urgent: 'bg-red-100 text-red-700',
-  }
-  const label = value.replace(/_/g, ' ')
-  return (
-    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${colors[value] ?? 'bg-slate-100 text-slate-600'}`}>
-      {label}
-    </span>
   )
 }
 
