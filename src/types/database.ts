@@ -17,6 +17,11 @@ export interface Database {
           name: string
           address: string | null
           subdomain: string
+          logo_url: string | null
+          city: string | null
+          state: string
+          phone: string | null
+          website: string | null
           created_at: string
         }
         Insert: {
@@ -24,6 +29,11 @@ export interface Database {
           name: string
           address?: string | null
           subdomain: string
+          logo_url?: string | null
+          city?: string | null
+          state?: string
+          phone?: string | null
+          website?: string | null
           created_at?: string
         }
         Update: {
@@ -31,6 +41,11 @@ export interface Database {
           name?: string
           address?: string | null
           subdomain?: string
+          logo_url?: string | null
+          city?: string | null
+          state?: string
+          phone?: string | null
+          website?: string | null
           created_at?: string
         }
       }
