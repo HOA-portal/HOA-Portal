@@ -28,13 +28,13 @@ export function ContactSection() {
     'w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition bg-white'
 
   return (
-    <section id="contact" className="bg-[#F9F8F5] py-24 px-6">
+    <section id="contact" className="bg-[#F9F8F5] py-14 md:py-24 px-6">
       <div className="max-w-xl mx-auto">
-        <div className="text-center mb-10">
+        <div className="text-center mb-6 md:mb-10">
           <p className="text-teal-700 text-xs font-semibold tracking-[0.2em] uppercase mb-3">
             Contact Us
           </p>
-          <h2 className="font-display text-4xl text-slate-900">
+          <h2 className="font-display text-3xl md:text-4xl text-slate-900">
             Let&apos;s get in touch.
           </h2>
           <p className="text-slate-500 mt-3 text-base">
@@ -43,7 +43,7 @@ export function ContactSection() {
         </div>
 
         {status === 'success' ? (
-          <div className="bg-white rounded-2xl p-10 text-center shadow-sm border border-teal-100">
+          <div className="bg-white rounded-2xl p-6 md:p-10 text-center shadow-sm border border-teal-100">
             <div className="w-12 h-12 rounded-full bg-teal-50 flex items-center justify-center mx-auto mb-4">
               <svg className="w-6 h-6 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
@@ -55,7 +55,7 @@ export function ContactSection() {
         ) : (
           <form
             onSubmit={handleSubmit}
-            className="bg-white rounded-2xl p-8 shadow-sm border border-slate-100 space-y-4"
+            className="bg-white rounded-2xl p-5 md:p-8 shadow-sm border border-slate-100 space-y-4"
           >
             <input
               type="text"

@@ -2,23 +2,23 @@ import Image from 'next/image'
 
 export function ExperienceSection() {
   return (
-    <section className="bg-white py-24 px-6">
-      <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-16 items-center">
+    <section className="bg-white py-14 md:py-24 px-6">
+      <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-10 md:gap-16 items-center">
         {/* Left: copy */}
         <div>
           <p className="text-teal-700 text-xs font-semibold tracking-[0.2em] uppercase mb-4">
             Experience Tara Cay
           </p>
-          <h2 className="font-display text-4xl md:text-5xl text-slate-900 leading-tight">
+          <h2 className="font-display text-3xl md:text-5xl text-slate-900 leading-tight">
             More than a home.<br />A lifestyle.
           </h2>
-          <p className="text-lg text-slate-500 mt-6 leading-relaxed">
+          <p className="text-base text-slate-500 mt-5 leading-relaxed">
             Imagine waking up just steps from the Intracoastal Waterway, enjoying the gulf breeze
             and the peace of a community with no through traffic. Tara Cay offers the feel of a
             single-family home with the convenience of resort-style amenities. Whether you&apos;re
             looking for your next home or accessing community services, you&apos;re in the right place.
           </p>
-          <ul className="mt-8 space-y-4">
+          <ul className="mt-6 space-y-3">
             {[
               'No through traffic — a private, peaceful community',
               'Resort-style living at HOA fees that make sense',
@@ -34,16 +34,16 @@ export function ExperienceSection() {
               </li>
             ))}
           </ul>
-          <div className="mt-10 flex gap-4">
+          <div className="mt-8 flex flex-col sm:flex-row gap-4">
             <a
               href="#contact"
-              className="inline-flex px-6 py-3 bg-teal-700 text-white text-sm font-semibold rounded-xl hover:bg-teal-600 transition-colors"
+              className="w-full sm:w-auto inline-flex justify-center px-6 py-3 bg-teal-700 text-white text-sm font-semibold rounded-xl hover:bg-teal-600 transition-colors"
             >
               View Available Units
             </a>
             <a
               href="#resident"
-              className="inline-flex px-6 py-3 border border-slate-200 text-slate-700 text-sm font-semibold rounded-xl hover:border-teal-300 hover:text-teal-700 transition-colors"
+              className="w-full sm:w-auto inline-flex justify-center px-6 py-3 border border-slate-200 text-slate-700 text-sm font-semibold rounded-xl hover:border-teal-300 hover:text-teal-700 transition-colors"
             >
               Resident Portal
             </a>
@@ -57,6 +57,7 @@ export function ExperienceSection() {
               src="/images/tara-cay/entrance.jpg"
               alt="Tara Cay Sound entrance"
               fill
+              sizes="(max-width: 768px) 100vw, 50vw"
               className="object-cover"
             />
           </div>

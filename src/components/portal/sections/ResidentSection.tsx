@@ -38,14 +38,14 @@ export function ResidentSection({ hoaSlug }: ResidentSectionProps) {
   ]
 
   return (
-    <section id="resident" className="bg-slate-800 py-24 px-6">
-      <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-16 items-start">
-        {/* Left: info + quick links */}
-        <div>
+    <section id="resident" className="bg-slate-800 py-14 md:py-24 px-6">
+      <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-10 md:gap-16 items-start">
+        {/* Left: info + quick links — shown second on mobile */}
+        <div className="order-last md:order-first">
           <p className="text-teal-400 text-xs font-semibold tracking-[0.2em] uppercase mb-4">
             Resident Space
           </p>
-          <h2 className="font-display text-4xl text-white leading-tight">
+          <h2 className="font-display text-3xl md:text-4xl text-white leading-tight">
             Already call<br />Tara Cay home?
           </h2>
           <p className="text-slate-400 mt-4 text-base leading-relaxed">
@@ -57,7 +57,7 @@ export function ResidentSection({ hoaSlug }: ResidentSectionProps) {
               <Link
                 key={link.label}
                 href={link.href}
-                className="flex items-center justify-between w-full border border-slate-600 hover:border-teal-400 rounded-xl px-6 py-4 text-white hover:text-teal-400 transition-all group"
+                className="flex items-center justify-between w-full border border-slate-600 hover:border-teal-400 rounded-xl px-5 py-4 text-white hover:text-teal-400 transition-all group"
               >
                 <span className="text-sm font-medium">{link.label}</span>
                 <svg
@@ -71,9 +71,9 @@ export function ResidentSection({ hoaSlug }: ResidentSectionProps) {
           </div>
         </div>
 
-        {/* Right: login card */}
-        <div className="bg-white rounded-2xl p-8 shadow-2xl">
-          <h3 className="font-semibold text-slate-900 text-lg mb-6">Resident Sign In</h3>
+        {/* Right: login card — shown first on mobile (most important CTA) */}
+        <div className="order-first md:order-last bg-white rounded-2xl p-5 md:p-8 shadow-2xl">
+          <h3 className="font-semibold text-slate-900 text-lg mb-5 md:mb-6">Resident Sign In</h3>
           <form onSubmit={handleSubmit} className="space-y-3">
             <input
               type="email"

@@ -58,13 +58,13 @@ const cards = [
 
 export function CommunityInfoSection() {
   return (
-    <section className="bg-[#F9F8F5] py-24 px-6">
+    <section className="bg-[#F9F8F5] py-14 md:py-24 px-6">
       <div className="max-w-5xl mx-auto">
-        <div className="text-center mb-14">
+        <div className="text-center mb-8 md:mb-14">
           <p className="text-teal-700 text-xs font-semibold tracking-[0.2em] uppercase mb-3">
             Community at a Glance
           </p>
-          <h2 className="font-display text-4xl text-slate-900">
+          <h2 className="font-display text-3xl md:text-4xl text-slate-900">
             Key Community Information
           </h2>
           <p className="text-slate-500 mt-3 text-base">
@@ -72,14 +72,14 @@ export function CommunityInfoSection() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
           {cards.map((card) => (
             <div
               key={card.title}
-              className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm hover:shadow-md hover:border-teal-100 transition-all"
+              className="bg-white rounded-2xl p-5 md:p-6 border border-slate-100 shadow-sm hover:shadow-md hover:border-teal-100 transition-all"
             >
               {card.icon}
-              <p className="text-xs font-semibold text-teal-700 uppercase tracking-widest mt-5 mb-1">
+              <p className="text-xs font-semibold text-teal-700 uppercase tracking-widest mt-4 md:mt-5 mb-1">
                 {card.title}
               </p>
               <p className="text-slate-600 text-sm leading-relaxed">{card.text}</p>

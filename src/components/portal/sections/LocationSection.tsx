@@ -43,13 +43,13 @@ const columns = [
 
 export function LocationSection() {
   return (
-    <section className="bg-slate-900 py-24 px-6">
+    <section className="bg-slate-900 py-14 md:py-24 px-6">
       <div className="max-w-5xl mx-auto">
-        <div className="text-center mb-16">
+        <div className="text-center mb-8 md:mb-16">
           <p className="text-teal-400 text-xs font-semibold tracking-[0.2em] uppercase mb-3">
             Where You&apos;ll Live
           </p>
-          <h2 className="font-display text-4xl text-white">
+          <h2 className="font-display text-3xl md:text-4xl text-white">
             Prime Location
           </h2>
           <p className="text-slate-400 mt-3 text-base">
@@ -59,9 +59,9 @@ export function LocationSection() {
 
         <div className="grid md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-700/60">
           {columns.map((col) => (
-            <div key={col.label} className="px-8 py-6 md:py-0 first:pl-0 last:pr-0">
+            <div key={col.label} className="py-8 md:py-0 md:px-8 first:md:pl-0 last:md:pr-0">
               {col.icon}
-              <h3 className="text-white font-semibold text-lg mt-4 mb-4">{col.label}</h3>
+              <h3 className="text-white font-semibold text-base md:text-lg mt-4 mb-3">{col.label}</h3>
               <ul className="space-y-3">
                 {col.bullets.map((b) => (
                   <li key={b} className="flex items-start gap-2.5 text-slate-300 text-sm">
