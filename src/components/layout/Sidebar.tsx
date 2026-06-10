@@ -22,6 +22,7 @@ const residentNav = [
   { href: '/work-orders', label: 'Work Orders', icon: Wrench },
   { href: '/bookings', label: 'Bookings', icon: CalendarDays },
   { href: '/complaints', label: 'Complaints', icon: ClipboardList },
+  { href: '/announcements', label: 'Announcements', icon: Megaphone },
 ]
 
 const adminNav = [
