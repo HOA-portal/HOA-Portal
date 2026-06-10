@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/select'
 import { StatusBadge } from '@/components/admin/StatusBadge'
 import { PhotoGallery } from '@/components/admin/PhotoGallery'
+import { toast } from 'sonner'
 import { updateComplaint } from '@/app/(app)/admin/actions'
 import type { ComplaintStatus } from '@/types/database'
 
@@ -57,6 +58,7 @@ export function ComplaintDetailModal({ complaint, open, onClose }: Props) {
       setError(result.error)
       setSaving(false)
     } else {
+      toast.success('Reclamação atualizada')
       router.refresh()
       onClose()
     }

@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/select'
 import { StatusBadge } from '@/components/admin/StatusBadge'
 import { PhotoGallery } from '@/components/admin/PhotoGallery'
+import { toast } from 'sonner'
 import { issueViolation, updateViolationStatus } from '@/app/(app)/admin/actions'
 import type { ViolationStatus } from '@/types/database'
 
@@ -61,6 +62,7 @@ export function ViolationDetailModal({ violation, open, onClose }: Props) {
       setError(result.error)
       setSaving(false)
     } else {
+      toast.success('Infração registrada')
       router.refresh()
       onClose()
     }
@@ -74,6 +76,7 @@ export function ViolationDetailModal({ violation, open, onClose }: Props) {
       setError(result.error)
       setSaving(false)
     } else {
+      toast.success('Status atualizado')
       router.refresh()
       onClose()
     }

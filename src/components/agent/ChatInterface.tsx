@@ -2,6 +2,7 @@
 
 import { useChat } from 'ai/react'
 import { useRef, useEffect, useState } from 'react'
+import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -256,20 +257,24 @@ export default function ChatInterface({ profile, sessionId, initialMessages = []
     api: apiRoute,
     initialMessages,
     body: { sessionId },
-    onFinish: async (message) => {
-      // Save user message to DB (assistant is saved by the API route)
+    onFinish: async () => {
       const supabase = createClient()
       const lastUserMessage = messages[messages.length - 1]
       if (lastUserMessage?.role === 'user') {
-        await supabase.from('chat_messages').insert({
+        const { error } = await supabase.from('chat_messages').insert({
           session_id: sessionId,
           hoa_id: profile.hoa_id,
           role: 'user',
           content: typeof lastUserMessage.content === 'string' ? lastUserMessage.content : '',
         })
+        if (error) toast.error('Não foi possível salvar a mensagem')
       }
     },
   })
+
+  useEffect(() => {
+    if (!sessionId) toast.error('Erro ao iniciar sessão de chat')
+  }, [sessionId])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -289,7 +294,9 @@ export default function ChatInterface({ profile, sessionId, initialMessages = []
         .from('incident-photos')
         .upload(path, file, { upsert: false })
 
-      if (!error) {
+      if (error) {
+        toast.error(`Falha ao enviar ${file.name}`)
+      } else {
         const { data } = supabase.storage.from('incident-photos').getPublicUrl(path)
         urls.push(data.publicUrl)
       }

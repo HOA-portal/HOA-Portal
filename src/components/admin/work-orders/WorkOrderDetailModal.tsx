@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/select'
 import { StatusBadge } from '@/components/admin/StatusBadge'
 import { PhotoGallery } from '@/components/admin/PhotoGallery'
+import { toast } from 'sonner'
 import { updateWorkOrder } from '@/app/(app)/admin/actions'
 import type { WorkOrderStatus } from '@/types/database'
 
@@ -58,6 +59,7 @@ export function WorkOrderDetailModal({ workOrder, open, onClose }: Props) {
       setError(result.error)
       setSaving(false)
     } else {
+      toast.success('Work order atualizado')
       router.refresh()
       onClose()
     }

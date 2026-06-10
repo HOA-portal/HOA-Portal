@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/admin/StatusBadge'
 import { NewAnnouncementModal } from './NewAnnouncementModal'
+import { toast } from 'sonner'
 import { publishAnnouncement, deleteAnnouncement } from '@/app/(app)/admin/actions'
 import { Mail, MessageSquare, Plus } from 'lucide-react'
 import type { AnnouncementStatus } from '@/types/database'
@@ -30,6 +31,7 @@ export function AnnouncementsList({ announcements }: { announcements: Announceme
   async function handlePublish(id: string) {
     setPendingId(id)
     await publishAnnouncement(id)
+    toast.success('Comunicado publicado')
     router.refresh()
     setPendingId(null)
   }
@@ -37,6 +39,7 @@ export function AnnouncementsList({ announcements }: { announcements: Announceme
   async function handleDelete(id: string) {
     setPendingId(id)
     await deleteAnnouncement(id)
+    toast.success('Comunicado removido')
     router.refresh()
     setPendingId(null)
   }

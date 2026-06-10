@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
+import { toast } from 'sonner'
 import { createAnnouncement } from '@/app/(app)/admin/actions'
 
 interface Props {
@@ -42,6 +43,7 @@ export function NewAnnouncementModal({ open, onClose }: Props) {
       setError(result.error)
       setSaving(false)
     } else {
+      toast.success('Comunicado criado')
       router.refresh()
       onClose()
     }
