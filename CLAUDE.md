@@ -94,6 +94,23 @@ Local Supabase dashboard: http://localhost:54323
 | `supabase/migrations/001_init_schema.sql` | Source of truth for all table definitions |
 | `supabase/migrations/002_rls_policies.sql` | All RLS policies and helper functions |
 
+## Testing Conventions
+
+Framework: **Vitest** para unitários/integração, **Playwright** para E2E. Ver `TESTING.md` para o guia completo.
+
+- Arquivos de teste: `src/**/*.test.ts` (co-locados com o fonte)
+- Arquivos E2E: `e2e/**/*.spec.ts` — **nunca** em `src/`, pois o Vitest os capturaria
+- Mock do Supabase: usar sempre `buildSupabaseMock()` de `src/test/mocks/supabase.ts`
+- Libs instanciadas com `new` (OpenAI, Resend, Twilio): obrigatório usar `vi.hoisted()` no mock
+- `redirect()` do Next.js: já mockado em `src/test/setup.ts` para lançar `Error('REDIRECT:/path')` — assertar com `.rejects.toThrow('REDIRECT:/chat')`
+- Mocks globais automáticos: `next/navigation`, `next/cache`, `next/headers` — não redeclarar nos arquivos de teste
+
+```bash
+npm run test:run      # roda todos os testes
+npm run test:coverage # coverage report
+npm run test:e2e      # E2E Playwright
+```
+
 ## What Not To Do
 
 - Do not use the Pages Router (`src/pages/`) — App Router only
