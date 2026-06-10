@@ -15,6 +15,7 @@ import {
   LogOut,
   ShieldAlert,
   Megaphone,
+  FileText,
 } from 'lucide-react'
 
 const residentNav = [
@@ -32,6 +33,7 @@ const adminNav = [
   { href: '/admin/violations', label: 'Violations', icon: ShieldAlert },
   { href: '/admin/complaints', label: 'Complaints', icon: ClipboardList },
   { href: '/admin/announcements', label: 'Announcements', icon: Megaphone },
+  { href: '/admin/documents', label: 'CC&R Documents', icon: FileText },
 ]
 
 interface SidebarProps {

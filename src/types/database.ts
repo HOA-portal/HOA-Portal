@@ -1,4 +1,5 @@
 export type UserRole = 'resident' | 'admin'
+export type DocumentStatus = 'pending' | 'processing' | 'completed' | 'failed'
 export type WorkOrderStatus = 'open' | 'in_progress' | 'resolved' | 'closed'
 export type WorkOrderPriority = 'low' | 'medium' | 'high' | 'urgent'
 export type BookingStatus = 'confirmed' | 'cancelled'
@@ -91,6 +92,11 @@ export interface Database {
           filename: string
           storage_path: string
           uploaded_by: string
+          status: DocumentStatus
+          page_count: number | null
+          chunk_count: number | null
+          error_message: string | null
+          processed_at: string | null
           created_at: string
         }
         Insert: {
@@ -99,6 +105,11 @@ export interface Database {
           filename: string
           storage_path: string
           uploaded_by: string
+          status?: DocumentStatus
+          page_count?: number | null
+          chunk_count?: number | null
+          error_message?: string | null
+          processed_at?: string | null
           created_at?: string
         }
         Update: {
@@ -107,6 +118,11 @@ export interface Database {
           filename?: string
           storage_path?: string
           uploaded_by?: string
+          status?: DocumentStatus
+          page_count?: number | null
+          chunk_count?: number | null
+          error_message?: string | null
+          processed_at?: string | null
           created_at?: string
         }
       }
@@ -119,6 +135,7 @@ export interface Database {
           section_title: string | null
           embedding: number[] | null
           chunk_index: number
+          metadata: Record<string, unknown>
           created_at: string
         }
         Insert: {
@@ -129,6 +146,7 @@ export interface Database {
           section_title?: string | null
           embedding?: number[] | null
           chunk_index: number
+          metadata?: Record<string, unknown>
           created_at?: string
         }
         Update: {
@@ -139,6 +157,7 @@ export interface Database {
           section_title?: string | null
           embedding?: number[] | null
           chunk_index?: number
+          metadata?: Record<string, unknown>
           created_at?: string
         }
       }
@@ -447,20 +466,32 @@ export interface Database {
       match_ccr_chunks: {
         Args: {
           query_embedding: unknown
+          query_text: string
           match_threshold: number
           match_count: number
           p_hoa_id: string
+          rrf_k?: number
         }
         Returns: Array<{
           id: string
           content: string
           section_title: string | null
+          metadata: Record<string, unknown>
           similarity: number
         }>
+      }
+      enqueue_document_processing: {
+        Args: {
+          p_document_id: string
+          p_hoa_id: string
+          p_storage_path: string
+        }
+        Returns: number
       }
     }
     Enums: {
       user_role: 'resident' | 'admin'
+      document_status: 'pending' | 'processing' | 'completed' | 'failed'
       work_order_status: 'open' | 'in_progress' | 'resolved' | 'closed'
       work_order_priority: 'low' | 'medium' | 'high' | 'urgent'
       booking_status: 'confirmed' | 'cancelled'

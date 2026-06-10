@@ -18,6 +18,7 @@ export interface RagChunk {
   id: string
   content: string
   section_title: string | null
+  metadata: Record<string, unknown>
   similarity: number
 }
 
@@ -33,6 +34,7 @@ export async function searchCCRs(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any).rpc('match_ccr_chunks', {
     query_embedding: embedding,
+    query_text: query,
     match_threshold: matchThreshold,
     match_count: matchCount,
     p_hoa_id: hoaId,
