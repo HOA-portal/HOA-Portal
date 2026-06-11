@@ -1,7 +1,8 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-// Database generic is applied after running: supabase gen types typescript --local > src/types/database.ts
+// Database generic requires all callers to use typed query chains.
+// Apply with: createServerClient<Database>(...) after fixing downstream `never` types.
 export async function createClient() {
   const cookieStore = await cookies()
 

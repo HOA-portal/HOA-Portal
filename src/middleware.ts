@@ -34,7 +34,8 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/auth/') ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api/') ||
-    pathname.startsWith('/portal/')
+    pathname.startsWith('/portal/') ||
+    pathname.startsWith('/demo')
 
   if (!user && !isAuthRoute && !isPublicRoute) {
     const url = request.nextUrl.clone()

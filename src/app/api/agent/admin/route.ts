@@ -36,7 +36,14 @@ export async function POST(request: Request) {
     .eq('id', profile.hoa_id)
     .single() as { data: Pick<Hoa, 'name'> | null; error: unknown }
 
-  const { messages, sessionId } = await request.json()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let parsed: any
+  try {
+    parsed = await request.json()
+  } catch {
+    return new Response('Invalid request body', { status: 400 })
+  }
+  const { messages, sessionId } = parsed
 
   const result = streamText({
     model: anthropic('claude-sonnet-4-5'),
