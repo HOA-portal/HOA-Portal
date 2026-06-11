@@ -20,6 +20,12 @@ export default async function DemoPage() {
 
   if (!profile) redirect('/api/demo/session')
 
+  const { data: hoa } = await supabase
+    .from('hoas')
+    .select('name')
+    .eq('id', profile.hoa_id)
+    .single() as { data: { name: string } | null; error: unknown }
+
   const today = new Date().toISOString().split('T')[0]
 
   let { data: session } = await supabase
@@ -52,7 +58,7 @@ export default async function DemoPage() {
       </div>
 
       <div className="shrink-0 border-b border-slate-200 bg-white px-6 py-4">
-        <h1 className="font-semibold text-slate-900">Community Assistant — Sunset Ridge HOA</h1>
+        <h1 className="font-semibold text-slate-900">Community Assistant — {hoa?.name ?? 'Sunset Ridge HOA'}</h1>
         <p className="text-sm text-muted-foreground">
           Ask about CC&amp;R rules, book amenities, submit requests, or file complaints
         </p>
