@@ -28,6 +28,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Community not found. Check the community code and try again.' }, { status: 404 })
   }
 
+  // Check if a pending invitation exists for this email in this HOA.
+  // If so, the resident should use the invite link instead of self-registering.
+  const { data: existingInvite } = await supabase
+    .from('resident_invitations')
+    .select('id')
+    .eq('hoa_id', hoa.id)
+    .ilike('email', email.trim())
+    .is('accepted_at', null)
+    .single()
+
+  if (existingInvite) {
+    return NextResponse.json(
+      { error: 'You have a pending invitation for this community. Please use the link in your invitation email to activate your account.' },
+      { status: 409 }
+    )
+  }
+
   const { data: authData, error: signUpError } = await supabase.auth.admin.createUser({
     email,
     password,
@@ -46,6 +63,7 @@ export async function POST(req: NextRequest) {
     full_name: fullName || null,
     unit_number: unitNumber || null,
     phone: phone || null,
+    email: email.toLowerCase().trim(),
   })
 
   if (profileError) {

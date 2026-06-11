@@ -23,6 +23,10 @@ const colors: Record<string, string> = {
   neighbor: 'bg-pink-100 text-pink-700',
   maintenance: 'bg-cyan-100 text-cyan-700',
   other: 'bg-slate-100 text-slate-600',
+  // Resident status
+  active: 'bg-green-100 text-green-700',
+  invited: 'bg-amber-100 text-amber-700',
+  inactive: 'bg-slate-100 text-slate-500',
 }
 
 export function StatusBadge({

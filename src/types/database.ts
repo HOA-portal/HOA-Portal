@@ -1,4 +1,5 @@
 export type UserRole = 'resident' | 'admin'
+export type ResidentStatus = 'active' | 'invited' | 'inactive'
 export type DocumentStatus = 'pending' | 'processing' | 'completed' | 'failed'
 export type WorkOrderStatus = 'open' | 'in_progress' | 'resolved' | 'closed'
 export type WorkOrderPriority = 'low' | 'medium' | 'high' | 'urgent'
@@ -59,6 +60,8 @@ export interface Database {
           unit_number: string | null
           phone: string | null
           avatar_url: string | null
+          email: string | null
+          is_active: boolean
           created_at: string
           updated_at: string
         }
@@ -70,6 +73,8 @@ export interface Database {
           unit_number?: string | null
           phone?: string | null
           avatar_url?: string | null
+          email?: string | null
+          is_active?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -81,8 +86,92 @@ export interface Database {
           unit_number?: string | null
           phone?: string | null
           avatar_url?: string | null
+          email?: string | null
+          is_active?: boolean
           created_at?: string
           updated_at?: string
+        }
+      }
+      resident_invitations: {
+        Row: {
+          id: string
+          hoa_id: string
+          email: string
+          full_name: string | null
+          unit_number: string | null
+          phone: string | null
+          role: UserRole
+          invitation_token: string
+          invited_by: string
+          invited_at: string
+          expires_at: string
+          accepted_at: string | null
+          external_id: string | null
+          external_source: string | null
+        }
+        Insert: {
+          id?: string
+          hoa_id: string
+          email: string
+          full_name?: string | null
+          unit_number?: string | null
+          phone?: string | null
+          role?: UserRole
+          invitation_token?: string
+          invited_by: string
+          invited_at?: string
+          expires_at?: string
+          accepted_at?: string | null
+          external_id?: string | null
+          external_source?: string | null
+        }
+        Update: {
+          id?: string
+          hoa_id?: string
+          email?: string
+          full_name?: string | null
+          unit_number?: string | null
+          phone?: string | null
+          role?: UserRole
+          invitation_token?: string
+          invited_by?: string
+          invited_at?: string
+          expires_at?: string
+          accepted_at?: string | null
+          external_id?: string | null
+          external_source?: string | null
+        }
+      }
+      crm_integrations: {
+        Row: {
+          id: string
+          hoa_id: string
+          provider: string
+          credentials: Record<string, unknown>
+          sync_config: Record<string, unknown>
+          last_synced_at: string | null
+          status: 'active' | 'paused' | 'error'
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          hoa_id: string
+          provider: string
+          credentials?: Record<string, unknown>
+          sync_config?: Record<string, unknown>
+          last_synced_at?: string | null
+          status?: 'active' | 'paused' | 'error'
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          hoa_id?: string
+          provider?: string
+          credentials?: Record<string, unknown>
+          sync_config?: Record<string, unknown>
+          last_synced_at?: string | null
+          status?: 'active' | 'paused' | 'error'
+          created_at?: string
         }
       }
       ccr_documents: {
@@ -542,6 +631,21 @@ export interface Database {
         }
         Returns: number
       }
+      get_invitation_by_token: {
+        Args: { p_token: string }
+        Returns: Array<{
+          id: string
+          hoa_id: string
+          email: string
+          full_name: string | null
+          unit_number: string | null
+          phone: string | null
+          role: UserRole
+          expires_at: string
+          hoa_name: string
+          hoa_subdomain: string
+        }>
+      }
     }
     Enums: {
       user_role: 'resident' | 'admin'
@@ -574,3 +678,5 @@ export type ChatSession = Database['public']['Tables']['chat_sessions']['Row']
 export type ChatMessage = Database['public']['Tables']['chat_messages']['Row']
 export type Announcement = Database['public']['Tables']['announcements']['Row']
 export type RagQueryLog = Database['public']['Tables']['rag_query_logs']['Row']
+export type ResidentInvitation = Database['public']['Tables']['resident_invitations']['Row']
+export type CrmIntegration = Database['public']['Tables']['crm_integrations']['Row']
