@@ -53,6 +53,9 @@ Tool availability is enforced at the API route level. A resident cannot trigger 
 ### CC&Rs RAG Pipeline
 Admins upload HOA rule PDFs. The system chunks them by section header (Article / Section patterns), embeds each chunk using a text embedding model, and stores embeddings in pgvector. When a resident or the AI asks a question, the nearest chunks are retrieved and Claude answers with section citations.
 
+### Resident Onboarding (Invite Flow)
+HOAs don't ask residents to self-register from scratch. Admins upload a CSV exported from any property management CRM (AppFolio, Yardi, Buildium, spreadsheets) and the system creates `resident_invitations` records — shadow profiles with no auth account yet. An invitation email is sent via Resend. Residents click the link, choose a password, and their account activates. Deactivated profiles (`is_active = false`) lose all data access because the `my_hoa_id()` RLS helper returns NULL, causing every policy to fail — without deleting any historical data.
+
 ## Local Development Setup
 
 ### Prerequisites
@@ -133,10 +136,12 @@ supabase/
 
 ## Feature Roadmap (MVP Phases)
 
-1. **Foundation** — Auth, multi-tenancy, role-aware dashboard
-2. **CC&Rs Oracle** — PDF upload, chunking, embedding, AI Q&A with citations
-3. **Work Orders** — resident submission via chat, admin triage
-4. **Announcements** — AI drafting, publish, email/SMS blast
-5. **Amenity Bookings** — calendar, conflict prevention, dues gate
-6. **Violations** — photo upload, AI-drafted formal notice, send to resident
-7. **Polish & Deploy** — rate limiting, mobile, production Vercel deploy
+1. ✅ **Foundation** — Auth, multi-tenancy, role-aware dashboard
+2. ✅ **CC&Rs Oracle** — PDF upload, chunking, embedding, hybrid RAG search (pgvector + tsvector RRF), AI Q&A with citations
+3. ✅ **Work Orders** — resident submission via chat, admin triage
+4. ✅ **Announcements** — AI drafting, publish, email/SMS blast
+5. ✅ **Amenity Bookings** — calendar, conflict prevention, dues gate
+6. ✅ **Violations** — photo upload, AI-drafted formal notice, send to resident
+7. ✅ **Resident Invite Flow** — bulk CSV import, shadow profiles, email invitations, profile deactivation with immediate session invalidation
+8. **CRM Webhooks** — real-time sync with AppFolio, Yardi, Buildium (move-in/move-out automation)
+9. **Polish & Deploy** — rate limiting, mobile optimization, production Vercel deploy

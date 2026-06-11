@@ -43,6 +43,8 @@ An AI-powered SaaS platform for US Homeowners Associations. It has two user role
 - Always use the `my_hoa_id()` and `my_role()` helper functions in policies — never inline subqueries
 - All migrations go in `supabase/migrations/` as numbered SQL files (`001_`, `002_`, etc.)
 - Never modify existing migrations; always create a new one
+- `profiles.is_active = false` → `my_hoa_id()` and `my_role()` return NULL → all RLS policies fail → user loses data access without account deletion
+- `resident_invitations` holds shadow profiles (no `auth.users` row yet); a full `profiles` row is only created when the resident accepts the invite via `/accept-invite/[token]`
 
 ### AI Agent Routes
 - Resident agent: `src/app/api/agent/resident/route.ts`
@@ -51,6 +53,13 @@ An AI-powered SaaS platform for US Homeowners Associations. It has two user role
 - **Security rule:** Never add admin tools to the resident route, even conditionally. The separation must be structural, not runtime-conditional.
 - Every tool `execute` function must scope database queries to `profile.hoa_id` — never trust client-provided `hoa_id`
 - Use `streamText` from the `ai` package and return `result.toDataStreamResponse()`
+
+### Resident Invite Flow
+- Admin uploads CSV at `POST /api/admin/residents/import` → rows inserted into `resident_invitations` + invitation email sent via Resend
+- Resident clicks link → `GET /accept-invite/[token]` (server component) fetches data via `get_invitation_by_token()` SECURITY DEFINER function (no auth session required)
+- `POST /api/auth/accept-invite` creates `auth.users` + `profiles` (with `is_active = true`) and marks `accepted_at` on the invitation
+- `PATCH /api/admin/residents/[id]/deactivate` with `{ active: false }` sets `profiles.is_active = false` and calls `auth.admin.signOut` to invalidate sessions
+- The traditional signup route (`POST /api/auth/signup`) returns 409 if a pending invitation exists for that email + HOA, directing the user to use the invite link instead
 
 ### Notifications
 - Email via `src/lib/notifications/email.ts` (wraps Resend)
@@ -71,6 +80,8 @@ Before any PR that touches auth, agents, or database:
 - [ ] No admin tool is accessible from the resident agent route
 - [ ] No `SUPABASE_SERVICE_ROLE_KEY` usage in client-side code
 - [ ] No user-provided `hoa_id` trusted in server-side tool execution
+- [ ] Invitation tokens are opaque UUIDs with 7-day TTL; lookup via `get_invitation_by_token()` (SECURITY DEFINER) only
+- [ ] Profile deactivation calls `auth.admin.signOut(userId, 'global')` to immediately invalidate all sessions
 
 ## Running Locally
 
@@ -93,6 +104,10 @@ Local Supabase dashboard: http://localhost:54323
 | `src/lib/ai/system-prompts.ts` | System prompt templates for both agents |
 | `supabase/migrations/001_init_schema.sql` | Source of truth for all table definitions |
 | `supabase/migrations/002_rls_policies.sql` | All RLS policies and helper functions |
+| `supabase/migrations/006_crm_integration.sql` | `profiles.email` + `is_active`, `resident_invitations`, `crm_integrations`, updated `my_hoa_id()`/`my_role()` helpers |
+| `src/app/api/admin/residents/import/route.ts` | Bulk CSV import → creates invitations + sends emails |
+| `src/app/api/auth/accept-invite/route.ts` | Converts invitation into `auth.users` + `profiles` |
+| `src/app/(auth)/accept-invite/[token]/page.tsx` | Pre-login invite acceptance page |
 
 ## Testing Conventions
 

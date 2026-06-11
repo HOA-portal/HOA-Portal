@@ -212,5 +212,5 @@ Para E2E funcionar em CI, adicione no GitHub → Settings → Secrets:
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `ANTHROPIC_API_KEY`
-- `OPENAI_API_KEY`
+- `RESEND_API_KEY`
 - `TEST_ADMIN_EMAIL` + `TEST_ADMIN_PASSWORD` (conta admin de testes no Supabase)
