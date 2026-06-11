@@ -16,6 +16,7 @@ import {
   ShieldAlert,
   Megaphone,
   FileText,
+  BarChart2,
 } from 'lucide-react'
 
 const residentNav = [
@@ -34,6 +35,7 @@ const adminNav = [
   { href: '/admin/complaints', label: 'Complaints', icon: ClipboardList },
   { href: '/admin/announcements', label: 'Announcements', icon: Megaphone },
   { href: '/admin/documents', label: 'CC&R Documents', icon: FileText },
+  { href: '/admin/analytics', label: 'RAG Analytics', icon: BarChart2 },
 ]
 
 interface SidebarProps {

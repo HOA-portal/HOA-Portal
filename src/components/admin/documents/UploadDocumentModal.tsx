@@ -60,7 +60,13 @@ export function UploadDocumentModal({ open, onClose }: Props) {
     xhr.addEventListener('load', () => {
       setUploading(false)
       if (xhr.status === 202) {
-        toast.success('Document uploaded — processing will begin shortly.')
+        let body: { duplicateWarning?: boolean } = {}
+        try { body = JSON.parse(xhr.responseText) } catch {}
+        if (body.duplicateWarning) {
+          toast.warning('A document with this filename already exists. Both will be indexed.')
+        } else {
+          toast.success('Document uploaded — processing will begin shortly.')
+        }
         setFile(null)
         setProgress(0)
         router.refresh()

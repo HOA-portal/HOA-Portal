@@ -57,6 +57,10 @@ const BATCH_SIZE = 3          // messages dequeued per invocation
 const VISIBILITY_TIMEOUT = 60 // seconds before message becomes visible again
 const EMBED_CONCURRENCY = 10  // parallel embedding calls
 const INSERT_BATCH = 50       // chunks per DB insert
+const EMBED_RETRY_ATTEMPTS = 3
+const EMBED_RETRY_BASE_MS = 1000  // doubles each attempt: 1s, 2s, 4s
+const OCR_PAGE_LIMIT = 80     // max pages per OCR call; larger docs are split
+const OCR_BLOCK_SIZE = 40     // pages per Claude OCR request
 
 // Same constants as document-processor.ts
 const SCANNED_PAGE_THRESHOLD = 50
@@ -265,28 +269,26 @@ async function extractPages(
       String.fromCharCode(...new Uint8Array(pdfBuffer))
     )
 
-    const { text: ocrText } = await generateText({
-      model: anthropic('claude-haiku-4-5-20251001'),
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'file' as const, data: base64, mimeType: 'application/pdf' as const },
-            {
-              type: 'text' as const,
-              text: 'Extract all text from this document verbatim. Preserve article and section headings exactly as written. Output only the extracted text.',
-            },
-          ],
-        },
-      ],
-      maxTokens: 8192,
-    })
+    let allOcrLines: string[] = []
 
-    const ocrLines = ocrText.split('\n')
-    const linesPerPage = Math.max(1, Math.ceil(ocrLines.length / pages.length))
+    if (pages.length <= OCR_PAGE_LIMIT) {
+      // Single OCR call for smaller documents
+      const { text: ocrText } = await ocrPageRange(base64, 1, pages.length)
+      allOcrLines = ocrText.split('\n')
+    } else {
+      // Split into blocks to avoid output token overflow (Haiku max = 8192 tokens)
+      for (let start = 1; start <= pages.length; start += OCR_BLOCK_SIZE) {
+        const end = Math.min(start + OCR_BLOCK_SIZE - 1, pages.length)
+        const { text: blockText } = await ocrPageRange(base64, start, end)
+        allOcrLines.push(...blockText.split('\n'))
+        console.log(`[process-document] OCR block pages ${start}-${end} done`)
+      }
+    }
+
+    const linesPerPage = Math.max(1, Math.ceil(allOcrLines.length / pages.length))
     pages = pages.map((page, idx) => ({
       ...page,
-      text: ocrLines.slice(idx * linesPerPage, (idx + 1) * linesPerPage).join('\n'),
+      text: allOcrLines.slice(idx * linesPerPage, (idx + 1) * linesPerPage).join('\n'),
       isImageOnly: false,
     }))
 
@@ -294,6 +296,32 @@ async function extractPages(
   }
 
   return { pages, isOcr: false, ocrPageCount: 0 }
+}
+
+async function ocrPageRange(
+  base64Pdf: string,
+  startPage: number,
+  endPage: number
+): Promise<{ text: string }> {
+  const rangeNote = startPage === endPage
+    ? `page ${startPage}`
+    : `pages ${startPage} through ${endPage}`
+  return generateText({
+    model: anthropic('claude-haiku-4-5-20251001'),
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'file' as const, data: base64Pdf, mimeType: 'application/pdf' as const },
+          {
+            type: 'text' as const,
+            text: `Extract the text from ${rangeNote} of this document verbatim. Preserve article and section headings exactly as written. Output only the extracted text.`,
+          },
+        ],
+      },
+    ],
+    maxTokens: 8192,
+  })
 }
 
 // ============================================================
@@ -486,14 +514,35 @@ function chunkSection(section: HierarchicalSection, isOcr: boolean): DocumentChu
 }
 
 // ============================================================
+// Helpers
+// ============================================================
+
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxAttempts = EMBED_RETRY_ATTEMPTS,
+  baseDelayMs = EMBED_RETRY_BASE_MS
+): Promise<T> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn()
+    } catch (err) {
+      if (attempt === maxAttempts) throw err
+      await new Promise(resolve => setTimeout(resolve, baseDelayMs * Math.pow(2, attempt - 1)))
+    }
+  }
+  throw new Error('unreachable')
+}
+
+// ============================================================
 // Embedding
 // ============================================================
 
 async function embedText(openai: OpenAI, text: string): Promise<number[]> {
-  const response = await openai.embeddings.create({
-    model: 'text-embedding-3-small',
-    input: text,
-    dimensions: 1536,
-  })
-  return response.data[0].embedding
+  return withRetry(() =>
+    openai.embeddings.create({
+      model: 'text-embedding-3-small',
+      input: text,
+      dimensions: 1536,
+    }).then(r => r.data[0].embedding)
+  )
 }

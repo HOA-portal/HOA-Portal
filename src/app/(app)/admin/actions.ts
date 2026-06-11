@@ -2,7 +2,9 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { sendEmail } from '@/lib/notifications/email'
+import { sendSms } from '@/lib/notifications/sms'
 import type {
   WorkOrderStatus,
   ComplaintStatus,
@@ -124,6 +126,17 @@ export async function publishAnnouncement(
   announcementId: string
 ): Promise<{ error?: string }> {
   const { supabase, hoaId } = await requireAdmin()
+
+  const { data: announcement } = await supabase
+    .from('announcements')
+    .select('subject, body, send_email, send_sms')
+    .eq('id', announcementId)
+    .eq('hoa_id', hoaId)
+    .eq('status', 'draft')
+    .single()
+
+  if (!announcement) return { error: 'Announcement not found or already published' }
+
   const { error } = await supabase
     .from('announcements')
     .update({
@@ -134,10 +147,53 @@ export async function publishAnnouncement(
     .eq('id', announcementId)
     .eq('hoa_id', hoaId)
     .eq('status', 'draft')
+
   if (error) return { error: error.message }
+
+  if (announcement.send_email || announcement.send_sms) {
+    await dispatchAnnouncementNotifications(hoaId, announcement)
+  }
+
   revalidatePath('/admin/announcements')
   revalidatePath('/admin')
   return {}
+}
+
+async function dispatchAnnouncementNotifications(
+  hoaId: string,
+  announcement: { subject: string; body: string; send_email: boolean; send_sms: boolean }
+) {
+  const serviceClient = await createServiceClient()
+
+  const { data: residents } = await serviceClient
+    .from('profiles')
+    .select('id, phone')
+    .eq('hoa_id', hoaId)
+    .eq('role', 'resident')
+
+  if (!residents?.length) return
+
+  const tasks: Promise<void>[] = []
+
+  if (announcement.send_email) {
+    const { data: { users } } = await serviceClient.auth.admin.listUsers({ perPage: 1000 })
+    const emailById = new Map(users.map(u => [u.id, u.email]))
+    const bodyHtml = `<p>${announcement.body.replace(/\n/g, '<br>')}</p>`
+
+    for (const resident of residents) {
+      const email = emailById.get(resident.id)
+      if (email) tasks.push(sendEmail(email, announcement.subject, bodyHtml))
+    }
+  }
+
+  if (announcement.send_sms) {
+    const smsBody = `${announcement.subject}\n\n${announcement.body}`
+    for (const resident of residents) {
+      if (resident.phone) tasks.push(sendSms(resident.phone, smsBody))
+    }
+  }
+
+  await Promise.allSettled(tasks)
 }
 
 export async function deleteAnnouncement(

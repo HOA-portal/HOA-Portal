@@ -1,7 +1,7 @@
 import { tool } from 'ai'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { searchCCRs } from './rag'
+import { searchCCRs, buildPassage } from './rag'
 import type { Profile } from '@/types/database'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -30,7 +30,7 @@ export function buildResidentTools(profile: Profile) {
           found: true,
           results: chunks.map((c) => ({
             section: c.section_title ?? 'General Rules',
-            content: c.content,
+            content: buildPassage(c),
             relevance: Math.round(c.similarity * 100),
           })),
         }

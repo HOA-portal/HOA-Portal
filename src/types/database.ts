@@ -453,6 +453,41 @@ export interface Database {
           updated_at?: string
         }
       }
+      rag_query_logs: {
+        Row: {
+          id: string
+          hoa_id: string
+          user_id: string | null
+          query_text: string
+          match_count: number
+          top_section_title: string | null
+          avg_similarity: number | null
+          had_results: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          hoa_id: string
+          user_id?: string | null
+          query_text: string
+          match_count: number
+          top_section_title?: string | null
+          avg_similarity?: number | null
+          had_results: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          hoa_id?: string
+          user_id?: string | null
+          query_text?: string
+          match_count?: number
+          top_section_title?: string | null
+          avg_similarity?: number | null
+          had_results?: boolean
+          created_at?: string
+        }
+      }
     }
     Functions: {
       my_hoa_id: {
@@ -475,6 +510,25 @@ export interface Database {
         Returns: Array<{
           id: string
           content: string
+          section_title: string | null
+          metadata: Record<string, unknown>
+          similarity: number
+        }>
+      }
+      match_ccr_chunks_with_context: {
+        Args: {
+          query_embedding: unknown
+          query_text: string
+          match_threshold: number
+          match_count: number
+          p_hoa_id: string
+          rrf_k?: number
+        }
+        Returns: Array<{
+          id: string
+          content: string
+          prev_content: string | null
+          next_content: string | null
           section_title: string | null
           metadata: Record<string, unknown>
           similarity: number
@@ -519,3 +573,4 @@ export type Violation = Database['public']['Tables']['violations']['Row']
 export type ChatSession = Database['public']['Tables']['chat_sessions']['Row']
 export type ChatMessage = Database['public']['Tables']['chat_messages']['Row']
 export type Announcement = Database['public']['Tables']['announcements']['Row']
+export type RagQueryLog = Database['public']['Tables']['rag_query_logs']['Row']

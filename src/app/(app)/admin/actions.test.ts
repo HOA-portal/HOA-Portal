@@ -149,15 +149,20 @@ describe('createAnnouncement', () => {
 
 describe('publishAnnouncement', () => {
   it('returns {} on success', async () => {
-    setupAdmin()
+    // Provide announcement data so the pre-flight select succeeds
+    setupAdmin({
+      data: { subject: 'Test', body: 'Body', send_email: false, send_sms: false },
+      error: null,
+    })
     const result = await publishAnnouncement('a-1')
     expect(result).toEqual({})
   })
 
-  it('returns { error } on DB failure', async () => {
-    setupDbError('Already published')
+  it('returns { error } when announcement not found or already published', async () => {
+    // select returns no data → early return with hardcoded message
+    setupAdmin({ data: null, error: null })
     const result = await publishAnnouncement('a-1')
-    expect(result).toEqual({ error: 'Already published' })
+    expect(result).toEqual({ error: 'Announcement not found or already published' })
   })
 })
 

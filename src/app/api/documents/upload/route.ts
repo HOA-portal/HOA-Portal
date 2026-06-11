@@ -60,6 +60,32 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const hoaId = profile.hoa_id
+
+  // Rate limit: max 10 uploads per HOA per hour
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+  const { count: recentCount } = await supabase
+    .from('ccr_documents')
+    .select('*', { count: 'exact', head: true })
+    .eq('hoa_id', hoaId)
+    .gte('created_at', oneHourAgo)
+
+  if ((recentCount ?? 0) >= 10) {
+    return Response.json(
+      { error: 'Upload limit reached. Maximum 10 documents per hour per community.' },
+      { status: 429 }
+    )
+  }
+
+  // Duplicate detection: warn if a document with the same filename already exists
+  const { data: existing } = await supabase
+    .from('ccr_documents')
+    .select('id, status')
+    .eq('hoa_id', hoaId)
+    .eq('filename', file.name)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
   const storagePath = `${hoaId}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
 
   // Upload to Supabase Storage
@@ -118,5 +144,9 @@ export async function POST(request: Request): Promise<Response> {
     // Intentionally fire-and-forget; pg_cron will drain the queue within 1 minute
   })
 
-  return Response.json({ documentId: doc.id, status: 'pending' }, { status: 202 })
+  return Response.json({
+    documentId: doc.id,
+    status: 'pending',
+    ...(existing ? { duplicateWarning: true, existingDocumentId: existing.id } : {}),
+  }, { status: 202 })
 }

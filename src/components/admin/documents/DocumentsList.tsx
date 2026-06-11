@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import { FileText, Loader2, CheckCircle2, XCircle, Clock, Plus, Trash2, RefreshCw } from 'lucide-react'
+import { FileText, Loader2, CheckCircle2, XCircle, Clock, Plus, Trash2, RefreshCw, Layers } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { UploadDocumentModal } from './UploadDocumentModal'
+import { DocumentChunksDrawer } from './DocumentChunksDrawer'
 import type { CcrDocument } from '@/app/(app)/admin/documents/page'
 
 const TERMINAL_STATUSES = new Set<CcrDocument['status']>(['completed', 'failed'])
@@ -42,6 +43,7 @@ export function DocumentsList({ documents }: { documents: CcrDocument[] }) {
   const router = useRouter()
   const [isUploadOpen, setIsUploadOpen] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [chunksDoc, setChunksDoc] = useState<CcrDocument | null>(null)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Poll every 3s while any document is in a non-terminal state
@@ -84,9 +86,15 @@ export function DocumentsList({ documents }: { documents: CcrDocument[] }) {
   async function handleRetry(id: string) {
     setBusyId(id)
     try {
-      // Re-upload is not possible, but we can reset status and re-enqueue
-      // via a dedicated endpoint. For now, delete + re-upload workflow.
-      toast.info('Please delete this document and re-upload to retry processing.')
+      const res = await fetch(`/api/documents/${id}`, { method: 'POST' })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error ?? 'Retry failed')
+      }
+      toast.success('Document re-queued for processing')
+      router.refresh()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Retry failed')
     } finally {
       setBusyId(null)
     }
@@ -157,6 +165,17 @@ export function DocumentsList({ documents }: { documents: CcrDocument[] }) {
                     </div>
 
                     <div className="flex gap-2 shrink-0">
+                      {doc.status === 'completed' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setChunksDoc(doc)}
+                          title="Inspect indexed chunks"
+                        >
+                          <Layers className="h-3.5 w-3.5 mr-1" />
+                          Chunks
+                        </Button>
+                      )}
                       {doc.status === 'failed' && (
                         <Button
                           variant="outline"
@@ -192,6 +211,16 @@ export function DocumentsList({ documents }: { documents: CcrDocument[] }) {
       )}
 
       <UploadDocumentModal open={isUploadOpen} onClose={() => setIsUploadOpen(false)} />
+
+      {chunksDoc && (
+        <DocumentChunksDrawer
+          documentId={chunksDoc.id}
+          filename={chunksDoc.filename}
+          chunkCount={chunksDoc.chunk_count ?? 0}
+          open={chunksDoc !== null}
+          onOpenChange={open => { if (!open) setChunksDoc(null) }}
+        />
+      )}
     </>
   )
 }

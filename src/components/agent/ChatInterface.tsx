@@ -22,6 +22,9 @@ import {
   Calendar,
   ClipboardList,
   MessageSquareWarning,
+  BookOpen,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 
 interface ChatInterfaceProps {
@@ -50,29 +53,67 @@ interface ToolResultData {
   endTime?: string
 }
 
-function ToolResultCard({ toolName, result }: { toolName: string; result: ToolResultData }) {
-  if (toolName === 'searchHOARules') {
-    if (!result.found) {
-      return (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-          <p className="font-medium">No matching rules found</p>
-          <p className="text-xs mt-1 text-amber-700">{result.message}</p>
-        </div>
-      )
-    }
+function SearchHOARulesCard({ result }: { result: ToolResultData }) {
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(null)
+
+  if (!result.found) {
     return (
-      <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 space-y-2">
-        <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide">
-          Rules & CC&Rs
-        </p>
-        {result.results?.slice(0, 3).map((r, i) => (
-          <div key={i} className="text-sm">
-            <span className="font-medium text-blue-900">{r.section}</span>
-            <p className="text-blue-800 mt-0.5 text-xs leading-relaxed line-clamp-3">{r.content}</p>
-          </div>
-        ))}
+      <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+        <p className="font-medium">No matching rules found</p>
+        <p className="text-xs mt-1 text-amber-700">{result.message}</p>
       </div>
     )
+  }
+
+  return (
+    <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 space-y-2">
+      <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide flex items-center gap-1.5">
+        <BookOpen className="h-3 w-3" />
+        CC&amp;R Sources ({result.results?.length ?? 0} found)
+      </p>
+      {result.results?.slice(0, 3).map((r, i) => {
+        const isExpanded = expandedIndex === i
+        const isLong = r.content.length > 150
+        return (
+          <div key={i} className="bg-white/70 rounded-md border border-blue-100 p-2.5">
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <span className="font-medium text-blue-900 text-xs leading-tight">{r.section}</span>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <div className="w-12 h-1.5 bg-blue-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-blue-400 rounded-full transition-all"
+                    style={{ width: `${r.relevance}%` }}
+                  />
+                </div>
+                <span className="text-[10px] text-blue-500 tabular-nums">{r.relevance}%</span>
+              </div>
+            </div>
+            <p className={cn('text-blue-800 text-xs leading-relaxed', !isExpanded && isLong && 'line-clamp-2')}>
+              {r.content}
+            </p>
+            {isLong && (
+              <button
+                type="button"
+                onClick={() => setExpandedIndex(isExpanded ? null : i)}
+                className="mt-1 flex items-center gap-0.5 text-[10px] text-blue-500 hover:text-blue-700 transition-colors"
+              >
+                {isExpanded ? (
+                  <><ChevronUp className="h-3 w-3" />Show less</>
+                ) : (
+                  <><ChevronDown className="h-3 w-3" />Show more</>
+                )}
+              </button>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function ToolResultCard({ toolName, result }: { toolName: string; result: ToolResultData }) {
+  if (toolName === 'searchHOARules') {
+    return <SearchHOARulesCard result={result} />
   }
 
   if (toolName === 'bookAmenity') {

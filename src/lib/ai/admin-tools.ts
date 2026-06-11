@@ -1,7 +1,7 @@
 import { tool } from 'ai'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { searchCCRs } from './rag'
+import { searchCCRs, buildPassage } from './rag'
 import { buildResidentTools } from './resident-tools'
 import type { Profile } from '@/types/database'
 
@@ -149,8 +149,8 @@ export function buildAdminTools(profile: Profile) {
         const ruleReference =
           ruleResults.length > 0
             ? ruleResults
-                .map((r) => `${r.section_title ?? 'Section'}: ${r.content.slice(0, 200)}`)
-                .join('\n')
+                .map((r) => `${r.section_title ?? 'Section'}: ${buildPassage(r).slice(0, 400)}`)
+                .join('\n\n---\n\n')
             : null
 
         const supabase = await createClient() as Db
