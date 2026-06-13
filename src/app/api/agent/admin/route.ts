@@ -1,6 +1,6 @@
 import { streamText } from 'ai'
-import { anthropic } from '@ai-sdk/anthropic'
 import { createClient } from '@/lib/supabase/server'
+import { getAgentModel } from '@/lib/ai/model'
 import { buildAdminTools } from '@/lib/ai/admin-tools'
 import { buildAdminSystemPrompt } from '@/lib/ai/system-prompts'
 import type { Profile, Hoa } from '@/types/database'
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
   const { messages, sessionId } = parsed
 
   const result = streamText({
-    model: anthropic('claude-sonnet-4-5'),
+    model: getAgentModel(),
     system: buildAdminSystemPrompt(hoa?.name ?? 'Your Community', profile.full_name),
     messages,
     tools: buildAdminTools(profile),
