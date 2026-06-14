@@ -53,7 +53,16 @@ export async function searchCCRs(
     return []
   }
 
-  const results: RagChunk[] = (data ?? []).map(row => ({
+  const rows = (data ?? []) as Array<{
+    id: string
+    content: string
+    prev_content: string | null
+    next_content: string | null
+    section_title: string | null
+    metadata: unknown
+    similarity: number
+  }>
+  const results: RagChunk[] = rows.map(row => ({
     id: row.id,
     content: row.content,
     prev_content: row.prev_content ?? null,

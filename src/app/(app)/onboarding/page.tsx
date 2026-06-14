@@ -10,11 +10,15 @@ export default async function OnboardingPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('role, hoa_id, full_name, onboarding_completed')
     .eq('id', user.id)
-    .single() as { data: (Pick<Profile, 'role' | 'hoa_id' | 'full_name'> & { onboarding_completed: boolean }) | null; error: unknown }
+    .single() as { data: (Pick<Profile, 'role' | 'hoa_id' | 'full_name'> & { onboarding_completed: boolean }) | null; error: { message: string; code: string } | null }
+
+  if (profileError) {
+    console.error('[onboarding/page] profile query failed:', profileError.message, profileError.code)
+  }
 
   if (!profile || profile.role !== 'admin') redirect('/chat')
   if (profile.onboarding_completed) redirect('/admin')
