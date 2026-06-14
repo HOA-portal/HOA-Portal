@@ -24,12 +24,24 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     .eq('id', profile.hoa_id)
     .single() as { data: Pick<Hoa, 'name'> | null; error: unknown }
 
+  const isDemo = user.email === 'demo@hoa-portal.app'
+
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
       <Sidebar profile={profile} hoaName={hoa?.name ?? 'HOA Portal'} />
-      <main className="flex-1 flex flex-col overflow-hidden">
-        {children}
-      </main>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {isDemo && (
+          <div className="shrink-0 bg-amber-50 border-b border-amber-200 px-4 py-2 text-center text-sm text-amber-800">
+            Você está visualizando uma <strong>demonstração ao vivo</strong> do HOA Portal.{' '}
+            <a href="/register" className="underline font-medium hover:text-amber-900">
+              Crie seu condomínio →
+            </a>
+          </div>
+        )}
+        <main className="flex-1 flex flex-col overflow-hidden">
+          {children}
+        </main>
+      </div>
     </div>
   )
 }

@@ -14,11 +14,12 @@ export default async function AdminDashboardPage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, hoa_id, full_name')
+    .select('role, hoa_id, full_name, onboarding_completed')
     .eq('id', user.id)
-    .single() as { data: Pick<Profile, 'role' | 'hoa_id' | 'full_name'> | null; error: unknown }
+    .single() as { data: (Pick<Profile, 'role' | 'hoa_id' | 'full_name'> & { onboarding_completed: boolean }) | null; error: unknown }
 
   if (!profile || profile.role !== 'admin') redirect('/chat')
+  if (!profile.onboarding_completed) redirect('/onboarding')
 
   const hoaId = profile.hoa_id
 

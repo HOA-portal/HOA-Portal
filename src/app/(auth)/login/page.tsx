@@ -46,6 +46,12 @@ export default function LoginPage() {
         <CardTitle className="text-2xl">Welcome back</CardTitle>
         <CardDescription>Sign in to your community account</CardDescription>
       </CardHeader>
+      <div className="mx-6 mb-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-center">
+        <p className="text-sm font-medium text-blue-800">Want to see HOA Portal in action?</p>
+        <a href="/api/demo/session" className="text-sm font-semibold text-blue-700 underline hover:text-blue-900">
+          Try the live admin demo →
+        </a>
+      </div>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -82,11 +88,17 @@ export default function LoginPage() {
           </Button>
         </form>
       </CardContent>
-      <CardFooter className="flex justify-center">
+      <CardFooter className="flex flex-col gap-2 text-center">
         <p className="text-sm text-muted-foreground">
-          Don&apos;t have an account?{' '}
+          HOA admin?{' '}
+          <Link href="/register" className="text-primary underline underline-offset-4 hover:text-primary/80">
+            Create your HOA →
+          </Link>
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Resident?{' '}
           <Link href="/signup" className="text-primary underline underline-offset-4 hover:text-primary/80">
-            Sign up
+            Join your community →
           </Link>
         </p>
       </CardFooter>
