@@ -34,7 +34,7 @@ export interface SupabaseMockOptions {
   user?: { id: string } | null
   userError?: unknown
   profile?: { role: string; hoa_id: string } | null
-  profileError?: unknown
+  profileError?: { message: string } | null
   dbResult?: DbResult
 }
 
