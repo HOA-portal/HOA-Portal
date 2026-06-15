@@ -18,12 +18,25 @@ export function buildResidentTools(profile: Profile) {
         query: z.string().describe('The question or topic to search for in the HOA rules'),
       }),
       execute: async ({ query }) => {
+        const supabase = await createClient() as Db
         const chunks = await searchCCRs(query, hoaId)
         if (chunks.length === 0) {
+          // Distinguish between "no documents ingested" and "no relevant section found"
+          const { count } = await supabase
+            .from('ccr_chunks')
+            .select('*', { count: 'exact', head: true })
+            .eq('hoa_id', hoaId)
+          if ((count ?? 0) === 0) {
+            return {
+              found: false,
+              reason: 'no_documents',
+              message: "The community's CC&R documents haven't been uploaded or processed yet. Ask your HOA admin to upload the documents.",
+            }
+          }
           return {
             found: false,
-            message:
-              "No relevant rules were found for that query. The community's CC&Rs may not cover this topic, or the documents haven't been uploaded yet.",
+            reason: 'no_match',
+            message: "No relevant rules were found for that specific query. The CC&Rs may not cover this topic, or try rephrasing the question.",
           }
         }
         return {

@@ -483,73 +483,78 @@ function estimateTokens(text: string): number {
   return Math.ceil(text.length / CHARS_PER_TOKEN)
 }
 
-function splitIntoSentences(text: string): string[] {
-  return text
-    .replace(/([.?!])\s+(?=[A-Z])/g, '$1\n')
-    .split('\n')
-    .map(s => s.trim())
-    .filter(Boolean)
+// Proposition-aware splitting: split on paragraph breaks first, then on sentence
+// boundaries. Each paragraph (or list item) is treated as a semantic unit that
+// should not be broken across chunks unless it exceeds MAX_TOKENS on its own.
+// This improves CC&R retrieval because each numbered rule stays coherent.
+function splitIntoPropositions(text: string): string[] {
+  // Normalize: collapse 3+ newlines to 2, then split on paragraph breaks
+  const paragraphs = text.replace(/\n{3,}/g, '\n\n').split(/\n\n+/)
+  const propositions: string[] = []
+
+  for (const para of paragraphs) {
+    const trimmed = para.trim()
+    if (!trimmed) continue
+
+    // If paragraph fits in a chunk, keep it whole (proposition chunking)
+    if (estimateTokens(trimmed) <= MAX_TOKENS) {
+      propositions.push(trimmed)
+      continue
+    }
+
+    // Paragraph is too large — split into sentences as a fallback
+    const sentences = trimmed
+      .replace(/([.?!;])\s+(?=[A-Z(])/g, '$1\n')
+      .split('\n')
+      .map(s => s.trim())
+      .filter(Boolean)
+    propositions.push(...sentences)
+  }
+
+  return propositions
 }
 
 function chunkSection(section: HierarchicalSection, isOcr: boolean, storagePath: string): DocumentChunk[] {
   const filename = storagePath.split('/').pop() ?? storagePath
   const pathCtx = section.hierarchyPath ? `${filename} > ${section.hierarchyPath}` : filename
   const prefix = `[${pathCtx}] `
-  const sentences = splitIntoSentences(section.content)
+  const propositions = splitIntoPropositions(section.content)
   const chunks: DocumentChunk[] = []
   let pending: string[] = []
   let pendingTokens = 0
 
+  const makeMetadata = () => ({
+    article: section.article,
+    section: section.section,
+    subsection: section.subsection,
+    page_numbers: section.pageNumbers,
+    section_type: section.type,
+    hierarchy_path: section.hierarchyPath,
+    is_ocr: isOcr,
+  })
+
   function flush() {
     if (!pending.length) return
-    const content = pending.join(' ').trim()
+    const content = pending.join('\n\n').trim()
     if (!content) return
-    chunks.push({
-      content,
-      embed_content: prefix + content,
-      section_title: section.title,
-      chunk_index: 0,
-      metadata: {
-        article: section.article,
-        section: section.section,
-        subsection: section.subsection,
-        page_numbers: section.pageNumbers,
-        section_type: section.type,
-        hierarchy_path: section.hierarchyPath,
-        is_ocr: isOcr,
-      },
-    })
+    chunks.push({ content, embed_content: prefix + content, section_title: section.title, chunk_index: 0, metadata: makeMetadata() })
     pending = []
     pendingTokens = 0
   }
 
-  for (const sentence of sentences) {
-    const sentTokens = estimateTokens(sentence)
+  for (const prop of propositions) {
+    const propTokens = estimateTokens(prop)
 
-    if (sentTokens > MAX_TOKENS) {
+    if (propTokens > MAX_TOKENS) {
       flush()
-      chunks.push({
-        content: sentence,
-        embed_content: prefix + sentence,
-        section_title: section.title,
-        chunk_index: 0,
-        metadata: {
-          article: section.article,
-          section: section.section,
-          subsection: section.subsection,
-          page_numbers: section.pageNumbers,
-          section_type: section.type,
-          hierarchy_path: section.hierarchyPath,
-          is_ocr: isOcr,
-        },
-      })
+      chunks.push({ content: prop, embed_content: prefix + prop, section_title: section.title, chunk_index: 0, metadata: makeMetadata() })
       continue
     }
 
-    if (pendingTokens + sentTokens > MAX_TOKENS && pending.length > 0) flush()
+    if (pendingTokens + propTokens > MAX_TOKENS && pending.length > 0) flush()
 
-    pending.push(sentence)
-    pendingTokens += sentTokens
+    pending.push(prop)
+    pendingTokens += propTokens
     if (pendingTokens >= TARGET_TOKENS) flush()
   }
 

@@ -132,7 +132,9 @@ export async function POST(request: Request): Promise<Response> {
     // Non-fatal: document is uploaded, admin can retry via UI
   }
 
-  // Fire-and-forget Edge Function trigger so processing starts immediately
+  // Fire-and-forget: try Edge Function first, then fall back to the internal processing route.
+  // Belt-and-suspenders: the first worker to claim the document (via optimistic lock) wins;
+  // the other worker gets a "no pending documents" response and exits cleanly.
   const edgeFnUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/process-document`
   fetch(edgeFnUrl, {
     method: 'POST',
@@ -142,8 +144,17 @@ export async function POST(request: Request): Promise<Response> {
     },
     body: '{}',
   }).catch((err) => {
-    // Fast-path trigger failed — pg_cron will drain the queue within 1 minute
-    console.error('[documents/upload] Edge Function fast-path trigger failed:', err)
+    console.error('[documents/upload] Edge Function trigger failed:', err)
+  })
+
+  // Fallback: also trigger the internal Next.js processing route.
+  // Works even if the Edge Function is not deployed or pg_cron is not configured.
+  const appOrigin = new URL(request.url).origin
+  fetch(`${appOrigin}/api/admin/documents/process`, {
+    method: 'POST',
+    headers: { Cookie: request.headers.get('cookie') ?? '' },
+  }).catch((err) => {
+    console.error('[documents/upload] Internal processing fallback failed:', err)
   })
 
   return Response.json({

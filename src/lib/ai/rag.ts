@@ -101,7 +101,7 @@ export async function searchCCRs(
   query: string,
   hoaId: string,
   matchCount = 5,
-  matchThreshold = 0.3,
+  matchThreshold = 0.15,
   useHyde = true
 ): Promise<RagChunk[]> {
   // HyDE: embed a hypothetical CC&R rule rather than the raw question.
