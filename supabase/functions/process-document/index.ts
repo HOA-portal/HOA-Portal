@@ -67,8 +67,8 @@ const TARGET_TOKENS = 500
 const MAX_TOKENS = 650
 const CHARS_PER_TOKEN = 4
 const ARTICLE_RE = /^ARTICLE\s+([IVXLCDM]+|\d+)[.:\s]\s*(.*)/i
-const SECTION_RE = /^(?:SECTION|Section|SEC\.?)\s+(\d+(?:\.\d+)*)[.:)]\s*(.*)/
-const SUBSECTION_RE = /^\s*\(([a-zA-Z])\)\s+/
+const SECTION_RE = /^(?:SECTION|SEC\.?)\s+(\d+(?:\.\d+)*)[.:)]\s*(.*)/i
+const SUBSECTION_RE = /^\s*\(([a-zA-Z])\)\s+/i
 
 // ============================================================
 // Entry Point
@@ -176,7 +176,7 @@ async function processMessage(
     const sections = parseHierarchy(pages)
     const allChunks: DocumentChunk[] = []
     for (const section of sections) {
-      allChunks.push(...chunkSection(section, isOcr))
+      allChunks.push(...chunkSection(section, isOcr, storage_path))
     }
     allChunks.forEach((c, i) => { c.chunk_index = i })
 
@@ -451,8 +451,10 @@ function splitIntoSentences(text: string): string[] {
     .filter(Boolean)
 }
 
-function chunkSection(section: HierarchicalSection, isOcr: boolean): DocumentChunk[] {
-  const prefix = section.hierarchyPath ? `[${section.hierarchyPath}] ` : ''
+function chunkSection(section: HierarchicalSection, isOcr: boolean, storagePath: string): DocumentChunk[] {
+  const filename = storagePath.split('/').pop() ?? storagePath
+  const pathCtx = section.hierarchyPath ? `${filename} > ${section.hierarchyPath}` : filename
+  const prefix = `[${pathCtx}] `
   const sentences = splitIntoSentences(section.content)
   const chunks: DocumentChunk[] = []
   let pending: string[] = []

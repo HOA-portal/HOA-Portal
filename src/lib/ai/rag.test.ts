@@ -3,8 +3,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { buildSupabaseMock } from '@/test/mocks/supabase'
 
 // vi.mock is hoisted — use vi.hoisted() to share variables with the factory
-const { mockEmbeddingsCreate } = vi.hoisted(() => ({
+const { mockEmbeddingsCreate, mockGenerateText } = vi.hoisted(() => ({
   mockEmbeddingsCreate: vi.fn(),
+  mockGenerateText: vi.fn(),
 }))
 
 vi.mock('openai', () => ({
@@ -13,6 +14,16 @@ vi.mock('openai', () => ({
       embeddings: { create: mockEmbeddingsCreate },
     }
   }),
+}))
+
+// Mock generateText (used by hydeExpand + rerankChunks)
+vi.mock('ai', () => ({
+  generateText: mockGenerateText,
+}))
+
+// Mock @ai-sdk/anthropic (imported by rag.ts but execution mocked above)
+vi.mock('@ai-sdk/anthropic', () => ({
+  anthropic: vi.fn(() => 'mock-anthropic-model'),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -26,6 +37,8 @@ const mockCreateClient = vi.mocked(createClient)
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // Default: generateText (HyDE + reranking) falls back gracefully
+  mockGenerateText.mockRejectedValue(new Error('no api key in tests'))
 })
 
 describe('embedText', () => {
@@ -125,7 +138,7 @@ describe('searchCCRs', () => {
     expect(result[1].prev_content).toBeNull()
   })
 
-  it('calls match_ccr_chunks_with_context RPC', async () => {
+  it('calls match_ccr_chunks_with_context RPC with default params (match_count doubled for reranking)', async () => {
     mockEmbeddingsCreate.mockResolvedValue({ data: [{ embedding: Array(1536).fill(0.5) }] })
 
     const mock = buildSupabaseMock({ dbResult: { data: fakeChunks, error: null } })
@@ -135,7 +148,7 @@ describe('searchCCRs', () => {
 
     expect(mock.rpc).toHaveBeenCalledWith('match_ccr_chunks_with_context', expect.objectContaining({
       p_hoa_id: 'hoa-1',
-      match_count: 5,
+      match_count: 10,       // matchCount(5) * 2 — extra candidates for reranker
       match_threshold: 0.3,
     }))
   })
@@ -150,7 +163,7 @@ describe('searchCCRs', () => {
     expect(result).toEqual([])
   })
 
-  it('passes custom matchCount and matchThreshold to RPC', async () => {
+  it('passes custom matchCount and matchThreshold to RPC (doubled for reranking)', async () => {
     mockEmbeddingsCreate.mockResolvedValue({ data: [{ embedding: Array(1536).fill(0.5) }] })
 
     const mock = buildSupabaseMock({ dbResult: { data: [], error: null } })
@@ -159,7 +172,7 @@ describe('searchCCRs', () => {
     await searchCCRs('query', 'hoa-1', 10, 0.75)
 
     expect(mock.rpc).toHaveBeenCalledWith('match_ccr_chunks_with_context', expect.objectContaining({
-      match_count: 10,
+      match_count: 20,      // matchCount(10) * 2
       match_threshold: 0.75,
     }))
   })
@@ -167,7 +180,6 @@ describe('searchCCRs', () => {
   it('fire-and-forget analytics insert does not throw on failure', async () => {
     mockEmbeddingsCreate.mockResolvedValue({ data: [{ embedding: Array(1536).fill(0.5) }] })
 
-    // Mock: RPC succeeds, but analytics insert fails silently
     const mock = buildSupabaseMock({ dbResult: { data: fakeChunks, error: null } })
     const originalFrom = mock.from.bind(mock)
     mock.from = vi.fn((table: string) => {
@@ -180,7 +192,6 @@ describe('searchCCRs', () => {
     })
     mockCreateClient.mockResolvedValue(mock as ReturnType<typeof buildSupabaseMock>)
 
-    // searchCCRs must resolve normally even when analytics insert throws
     const result = await searchCCRs('pool rules', 'hoa-1')
     expect(result).toHaveLength(2)
   })
@@ -198,7 +209,6 @@ describe('searchCCRs', () => {
 
     await searchCCRs('obscure query with no results', 'hoa-1')
 
-    // Wait for the fire-and-forget microtask to flush
     await new Promise(resolve => setTimeout(resolve, 0))
 
     expect(insertSpy).toHaveBeenCalledWith(
@@ -208,5 +218,87 @@ describe('searchCCRs', () => {
         query_text: 'obscure query with no results',
       })
     )
+  })
+
+  it('HyDE: embeds the hypothetical passage when generateText succeeds', async () => {
+    mockGenerateText.mockResolvedValue({ text: 'No pool equipment shall be used after 10pm.' })
+    mockEmbeddingsCreate.mockResolvedValue({ data: [{ embedding: Array(1536).fill(0.9) }] })
+
+    const mock = buildSupabaseMock({ dbResult: { data: [], error: null } })
+    mockCreateClient.mockResolvedValue(mock as ReturnType<typeof buildSupabaseMock>)
+
+    await searchCCRs('can I use the pool late at night?', 'hoa-1')
+
+    // embedText should have been called with the HyDE-generated text, not the raw query
+    expect(mockEmbeddingsCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ input: 'No pool equipment shall be used after 10pm.' })
+    )
+    // Full-text search still uses original query
+    expect(mock.rpc).toHaveBeenCalledWith('match_ccr_chunks_with_context', expect.objectContaining({
+      query_text: 'can I use the pool late at night?',
+    }))
+  })
+
+  it('HyDE: falls back to original query when generateText fails', async () => {
+    // mockGenerateText already rejects by default in beforeEach
+    mockEmbeddingsCreate.mockResolvedValue({ data: [{ embedding: Array(1536).fill(0.5) }] })
+
+    const mock = buildSupabaseMock({ dbResult: { data: [], error: null } })
+    mockCreateClient.mockResolvedValue(mock as ReturnType<typeof buildSupabaseMock>)
+
+    await searchCCRs('pool rules', 'hoa-1')
+
+    // Falls back: embedText called with the original query
+    expect(mockEmbeddingsCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ input: 'pool rules' })
+    )
+  })
+
+  it('HyDE: skipped when useHyde=false', async () => {
+    mockEmbeddingsCreate.mockResolvedValue({ data: [{ embedding: Array(1536).fill(0.5) }] })
+
+    const mock = buildSupabaseMock({ dbResult: { data: [], error: null } })
+    mockCreateClient.mockResolvedValue(mock as ReturnType<typeof buildSupabaseMock>)
+
+    await searchCCRs('pool rules', 'hoa-1', 5, 0.3, false)
+
+    expect(mockGenerateText).not.toHaveBeenCalled()
+    expect(mockEmbeddingsCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ input: 'pool rules' })
+    )
+  })
+
+  it('reranking: reorders chunks when Claude returns a ranking', async () => {
+    // First generateText call = HyDE, second = reranking
+    mockGenerateText
+      .mockResolvedValueOnce({ text: 'HOA rule about pool glass containers.' })
+      .mockResolvedValueOnce({ text: '2,1' })  // reranker prefers chunk-2 over chunk-1
+
+    mockEmbeddingsCreate.mockResolvedValue({ data: [{ embedding: Array(1536).fill(0.5) }] })
+
+    const mock = buildSupabaseMock({ dbResult: { data: fakeChunks, error: null } })
+    mockCreateClient.mockResolvedValue(mock as ReturnType<typeof buildSupabaseMock>)
+
+    // matchCount=1 → topN=1, candidates=2 → reranker runs (2 > 1)
+    const result = await searchCCRs('glass in pool area', 'hoa-1', 1)
+
+    // Reranker put chunk-2 first, so it's the one returned
+    expect(result[0].id).toBe('chunk-2')
+    expect(result).toHaveLength(1)
+  })
+
+  it('reranking: falls back to original order when Claude call fails', async () => {
+    // First call = HyDE fails (fallback to original), second = rerank also fails
+    mockGenerateText.mockRejectedValue(new Error('no api key'))
+    mockEmbeddingsCreate.mockResolvedValue({ data: [{ embedding: Array(1536).fill(0.5) }] })
+
+    const mock = buildSupabaseMock({ dbResult: { data: fakeChunks, error: null } })
+    mockCreateClient.mockResolvedValue(mock as ReturnType<typeof buildSupabaseMock>)
+
+    const result = await searchCCRs('pool rules', 'hoa-1')
+
+    // Falls back to original RRF order
+    expect(result[0].id).toBe('chunk-1')
+    expect(result[1].id).toBe('chunk-2')
   })
 })
