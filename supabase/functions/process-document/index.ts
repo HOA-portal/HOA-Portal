@@ -6,8 +6,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import OpenAI from 'npm:openai@4'
 import { extractText, getDocumentProxy } from 'npm:unpdf@0.11'
-import { generateText } from 'npm:ai@4'
-import { anthropic } from 'npm:@ai-sdk/anthropic@1'
+import Anthropic from 'npm:@anthropic-ai/sdk@0'
 
 // ============================================================
 // Types
@@ -50,16 +49,21 @@ interface DocumentChunk {
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')!
+const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')!
 
 const QUEUE_NAME = 'document_processing'
 const BATCH_SIZE = 3             // messages dequeued per invocation
-const VISIBILITY_TIMEOUT = 600   // 10 min — prevents duplicate processing for large OCR PDFs
+// 130s: keeps messages locked just under Supabase's 150s EF wall-clock limit.
+// If the EF is killed externally (timeout), the message re-appears after 130s
+// for the next pg_cron invocation to pick up — preventing silent drops.
+const VISIBILITY_TIMEOUT = 130
 const INSERT_BATCH = 50          // chunks per DB insert
 const EMBED_RETRY_ATTEMPTS = 3
 const OVERLAP_CHARS = 400        // ~100 tokens of overlap between adjacent chunks
 const EMBED_RETRY_BASE_MS = 1000  // doubles each attempt: 1s, 2s, 4s
 const OCR_PAGE_LIMIT = 80     // max pages per OCR call; larger docs are split
 const OCR_BLOCK_SIZE = 40     // pages per Claude OCR request
+const POISON_PILL_LIMIT = 3   // fail permanently after this many read attempts
 
 // Same constants as document-processor.ts
 const SCANNED_PAGE_THRESHOLD = 50
@@ -130,9 +134,9 @@ async function drainQueue(
     await processMessage(supabase, openai, msg)
   }
 
-  // Self-recurse if queue has more work and we have time budget (< 100s elapsed)
+  // Self-recurse if queue has more work and we have time budget (< 110s elapsed)
   const elapsed = (Date.now() - startTime) / 1000
-  if (elapsed < 100 && messages.length === BATCH_SIZE) {
+  if (elapsed < 110 && messages.length === BATCH_SIZE) {
     await drainQueue(supabase, openai, startTime)
   }
 }
@@ -148,7 +152,19 @@ async function processMessage(
 ): Promise<void> {
   const { document_id, hoa_id, storage_path } = msg.message
 
-  console.log(`[process-document] Processing doc ${document_id}`)
+  // Poison-pill guard: if a message has been dequeued too many times, the
+  // document is broken. Fail it permanently and remove from queue.
+  if (msg.read_ct >= POISON_PILL_LIMIT) {
+    console.error(`[process-document] Poison pill: doc ${document_id} read ${msg.read_ct} times — failing permanently`)
+    await supabase.from('ccr_documents').update({
+      status: 'failed',
+      error_message: `Processing failed after ${msg.read_ct} attempts — contact support`,
+    }).eq('id', document_id)
+    await supabase.rpc('pgmq_delete', { queue_name: QUEUE_NAME, msg_id: msg.msg_id })
+    return
+  }
+
+  console.log(`[process-document] Processing doc ${document_id} (attempt ${msg.read_ct + 1})`)
 
   // Mark as processing
   await supabase
@@ -223,7 +239,7 @@ async function processMessage(
     // Ack the message
     await supabase.rpc('pgmq_delete', { queue_name: QUEUE_NAME, msg_id: msg.msg_id })
 
-    console.log(`[process-document] Done: ${allChunks.length} chunks, ${pages.length} pages, OCR=${isOcr}`)
+    console.log(`[process-document] Done: ${allChunks.length} chunks, ${pages.length} pages, OCR=${isOcr}, ocrPages=${ocrPageCount}`)
   } catch (err) {
     console.error(`[process-document] Failed doc ${document_id}:`, err)
 
@@ -241,7 +257,7 @@ async function processMessage(
 }
 
 // ============================================================
-// PDF Extraction + OCR (inlined from document-processor.ts logic)
+// PDF Extraction + OCR
 // ============================================================
 
 interface PageContent {
@@ -267,9 +283,10 @@ async function extractPages(
   const isOcr = scannedRatio > 0.3
 
   if (isOcr) {
-    const base64 = btoa(
-      String.fromCharCode(...new Uint8Array(pdfBuffer))
-    )
+    // Safe base64 encoding: chunked approach avoids RangeError for large ArrayBuffers.
+    // Spreading a large Uint8Array into String.fromCharCode(...) exceeds the JS
+    // call stack limit (~65K args) for PDFs > ~64KB.
+    const base64 = bufferToBase64(pdfBuffer)
 
     let allOcrLines: string[] = []
 
@@ -300,30 +317,53 @@ async function extractPages(
   return { pages, isOcr: false, ocrPageCount: 0 }
 }
 
+// Safe base64 encoding for arbitrarily large ArrayBuffers.
+// Using spread operator on large Uint8Arrays throws RangeError (call stack overflow).
+// Chunked approach processes 32KB at a time, which is safe for all JS engines.
+function bufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer)
+  const CHUNK = 32768
+  let binary = ''
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + CHUNK, bytes.length)))
+  }
+  return btoa(binary)
+}
+
+// OCR via raw Anthropic SDK using the 'document' content block type.
+// The Vercel AI SDK (npm:ai@4 + @ai-sdk/anthropic@1) uses a different
+// content part format that doesn't reliably map to Anthropic's document block.
+// Using the raw SDK eliminates the adapter layer and ensures correct PDF handling.
 async function ocrPageRange(
   base64Pdf: string,
   startPage: number,
   endPage: number
 ): Promise<{ text: string }> {
+  const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY })
   const rangeNote = startPage === endPage
     ? `page ${startPage}`
     : `pages ${startPage} through ${endPage}`
-  return generateText({
-    model: anthropic('claude-haiku-4-5-20251001'),
-    messages: [
-      {
-        role: 'user',
-        content: [
-          { type: 'file' as const, data: base64Pdf, mimeType: 'application/pdf' as const },
-          {
-            type: 'text' as const,
-            text: `Extract the text from ${rangeNote} of this document verbatim. Preserve article and section headings exactly as written. Output only the extracted text.`,
-          },
-        ],
-      },
-    ],
-    maxTokens: 8192,
+
+  const response = await client.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 8192,
+    messages: [{
+      role: 'user',
+      content: [
+        {
+          type: 'document',
+          source: { type: 'base64', media_type: 'application/pdf', data: base64Pdf },
+        },
+        {
+          type: 'text',
+          text: `Extract the text from ${rangeNote} of this document verbatim. Preserve article and section headings exactly as written. Output only the extracted text.`,
+        },
+      ],
+    }],
   })
+
+  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  return { text }
 }
 
 // ============================================================

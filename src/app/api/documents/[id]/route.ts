@@ -128,10 +128,18 @@ export async function POST(
   // Delete any partial chunks from the failed run to avoid duplicates
   await supabase.from('ccr_chunks').delete().eq('document_id', id)
 
-  // Reset document status before re-enqueuing
+  // Reset document status before re-enqueuing.
+  // last_queued_at must be refreshed so fail_stale_documents() doesn't immediately
+  // re-fail the document (it checks last_queued_at < now() - 10min, not created_at).
   const { error: updateError } = await supabase
     .from('ccr_documents')
-    .update({ status: 'pending', error_message: null, processed_at: null, chunk_count: null })
+    .update({
+      status: 'pending',
+      error_message: null,
+      processed_at: null,
+      chunk_count: null,
+      last_queued_at: new Date().toISOString(),
+    })
     .eq('id', id)
 
   if (updateError) {

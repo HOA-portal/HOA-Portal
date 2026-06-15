@@ -190,6 +190,7 @@ export interface Database {
           error_message: string | null
           processed_at: string | null
           created_at: string
+          last_queued_at: string | null
         }
         Insert: {
           id?: string
@@ -203,6 +204,7 @@ export interface Database {
           error_message?: string | null
           processed_at?: string | null
           created_at?: string
+          last_queued_at?: string | null
         }
         Update: {
           id?: string
@@ -216,6 +218,7 @@ export interface Database {
           error_message?: string | null
           processed_at?: string | null
           created_at?: string
+          last_queued_at?: string | null
         }
       }
       ccr_chunks: {

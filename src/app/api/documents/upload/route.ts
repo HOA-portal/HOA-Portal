@@ -108,6 +108,7 @@ export async function POST(request: Request): Promise<Response> {
       filename: file.name,
       storage_path: storagePath,
       uploaded_by: user.id,
+      last_queued_at: new Date().toISOString(),
     })
     .select('id')
     .single()
