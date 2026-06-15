@@ -136,7 +136,7 @@ describe('searchCCRs', () => {
     expect(mock.rpc).toHaveBeenCalledWith('match_ccr_chunks_with_context', expect.objectContaining({
       p_hoa_id: 'hoa-1',
       match_count: 5,
-      match_threshold: 0.5,
+      match_threshold: 0.3,
     }))
   })
 

@@ -8,7 +8,6 @@ import OpenAI from 'npm:openai@4'
 import { extractText, getDocumentProxy } from 'npm:unpdf@0.11'
 import { generateText } from 'npm:ai@4'
 import { anthropic } from 'npm:@ai-sdk/anthropic@1'
-import pLimit from 'npm:p-limit@6'
 
 // ============================================================
 // Types
@@ -53,11 +52,11 @@ const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')!
 
 const QUEUE_NAME = 'document_processing'
-const BATCH_SIZE = 3          // messages dequeued per invocation
-const VISIBILITY_TIMEOUT = 60 // seconds before message becomes visible again
-const EMBED_CONCURRENCY = 10  // parallel embedding calls
-const INSERT_BATCH = 50       // chunks per DB insert
+const BATCH_SIZE = 3             // messages dequeued per invocation
+const VISIBILITY_TIMEOUT = 600   // 10 min — prevents duplicate processing for large OCR PDFs
+const INSERT_BATCH = 50          // chunks per DB insert
 const EMBED_RETRY_ATTEMPTS = 3
+const OVERLAP_CHARS = 400        // ~100 tokens of overlap between adjacent chunks
 const EMBED_RETRY_BASE_MS = 1000  // doubles each attempt: 1s, 2s, 4s
 const OCR_PAGE_LIMIT = 80     // max pages per OCR call; larger docs are split
 const OCR_BLOCK_SIZE = 40     // pages per Claude OCR request
@@ -181,13 +180,16 @@ async function processMessage(
     }
     allChunks.forEach((c, i) => { c.chunk_index = i })
 
-    // Embed all chunks (concurrency-limited)
-    const limit = pLimit(EMBED_CONCURRENCY)
-    const embeddings = await Promise.all(
-      allChunks.map(chunk =>
-        limit(() => embedText(openai, chunk.embed_content))
-      )
-    )
+    // Inject overlap into embed_content (enriches retrieval without polluting display content)
+    for (let i = 1; i < allChunks.length; i++) {
+      const overlapText = allChunks[i - 1].content.slice(-OVERLAP_CHARS)
+      if (overlapText) {
+        allChunks[i].embed_content = overlapText + '\n' + allChunks[i].embed_content
+      }
+    }
+
+    // Embed all chunks in a single batched API call (OpenAI supports up to 2048 inputs)
+    const embeddings = await embedBatch(openai, allChunks.map(c => c.embed_content))
 
     // Bulk insert in batches
     for (let i = 0; i < allChunks.length; i += INSERT_BATCH) {
@@ -534,15 +536,23 @@ async function withRetry<T>(
 }
 
 // ============================================================
-// Embedding
+// Embedding — batched for efficiency
+// OpenAI supports up to 2048 inputs per call; embeddings are returned in input order.
 // ============================================================
 
-async function embedText(openai: OpenAI, text: string): Promise<number[]> {
-  return withRetry(() =>
-    openai.embeddings.create({
-      model: 'text-embedding-3-small',
-      input: text,
-      dimensions: 1536,
-    }).then(r => r.data[0].embedding)
-  )
+async function embedBatch(openai: OpenAI, texts: string[]): Promise<number[][]> {
+  const MAX_BATCH = 2048
+  const results: number[][] = []
+  for (let i = 0; i < texts.length; i += MAX_BATCH) {
+    const batch = texts.slice(i, i + MAX_BATCH)
+    const response = await withRetry(() =>
+      openai.embeddings.create({
+        model: 'text-embedding-3-small',
+        input: batch,
+        dimensions: 1536,
+      })
+    )
+    results.push(...response.data.map(d => d.embedding))
+  }
+  return results
 }

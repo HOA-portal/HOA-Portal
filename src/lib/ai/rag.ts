@@ -35,7 +35,7 @@ export async function searchCCRs(
   query: string,
   hoaId: string,
   matchCount = 5,
-  matchThreshold = 0.5
+  matchThreshold = 0.3
 ): Promise<RagChunk[]> {
   const embedding = await embedText(query)
   const supabase = await createClient()

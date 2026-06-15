@@ -18,10 +18,6 @@ enabled = true
 port = 54323
 api_url = "http://127.0.0.1"
 
-[ingest]
-enabled = true
-port = 54324
-
 [storage]
 enabled = true
 file_size_limit = "50MiB"
@@ -44,8 +40,3 @@ enable_confirmations = false
 
 [analytics]
 enabled = false
-
-# Production project reference — used by `supabase db push`
-# project_id links `supabase link --project-ref nlyaugdlkbssfulvgraj`
-[project]
-id = "nlyaugdlkbssfulvgraj"

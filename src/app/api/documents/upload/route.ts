@@ -140,8 +140,9 @@ export async function POST(request: Request): Promise<Response> {
       Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
     },
     body: '{}',
-  }).catch(() => {
-    // Intentionally fire-and-forget; pg_cron will drain the queue within 1 minute
+  }).catch((err) => {
+    // Fast-path trigger failed — pg_cron will drain the queue within 1 minute
+    console.error('[documents/upload] Edge Function fast-path trigger failed:', err)
   })
 
   return Response.json({

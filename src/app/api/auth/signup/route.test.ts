@@ -32,7 +32,10 @@ function makeChain(result: unknown) {
   const chain = {
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
+    ilike: vi.fn().mockReturnThis(),
+    is: vi.fn().mockReturnThis(),
     single: vi.fn().mockResolvedValue(result),
+    maybeSingle: vi.fn().mockResolvedValue(result),
     insert: vi.fn().mockResolvedValue(result),
     delete: vi.fn().mockReturnThis(),
   }
