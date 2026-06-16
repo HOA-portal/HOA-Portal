@@ -46,6 +46,8 @@ export async function POST(request: Request) {
     messages,
     tools: buildResidentTools(profile),
     maxSteps: 5,
+    temperature: 0.2,
+    maxTokens: 600,
     onFinish: async ({ text }) => {
       if (!sessionId || !text) return
       await supabase.from('chat_messages').insert({

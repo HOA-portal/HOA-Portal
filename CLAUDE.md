@@ -11,7 +11,7 @@ An AI-powered SaaS platform for US Homeowners Associations. It has two user role
 - **Next.js 14+** with App Router and TypeScript (no Pages Router)
 - **Supabase** for Postgres, Auth, Storage, and pgvector
 - **Vercel AI SDK** (`ai` package) with `streamText` and `useChat`
-- **Anthropic Claude** as the LLM (`claude-sonnet-4-5` default)
+- **GPT-4o-mini** as the default LLM. Switch to Anthropic by setting `AGENT_LLM_PROVIDER=anthropic` and `AGENT_LLM_MODEL=claude-sonnet-4-5` in env vars (`src/lib/ai/model.ts`)
 - **Tailwind CSS + shadcn/ui** for all UI components
 - **Resend** for email, **Twilio** for SMS
 
