@@ -196,6 +196,23 @@ async function processMessage(
     }
     allChunks.forEach((c, i) => { c.chunk_index = i })
 
+    // Guard: fail loudly if no chunks were produced (e.g. corrupt PDF or unexpected OCR failure)
+    if (allChunks.length === 0) {
+      await supabase
+        .from('ccr_documents')
+        .update({
+          status: 'failed',
+          error_message: isOcr
+            ? 'OCR ran but no text was extracted. The PDF may be corrupted or in an unsupported format.'
+            : 'No text found in PDF. The document may be a scanned image that requires OCR.',
+          page_count: pages.length,
+        })
+        .eq('id', document_id)
+      await supabase.rpc('pgmq_delete', { queue_name: QUEUE_NAME, msg_id: msg.msg_id })
+      console.warn(`[process-document] 0 chunks produced for doc ${document_id} — marked failed`)
+      return
+    }
+
     // Inject overlap into embed_content (enriches retrieval without polluting display content)
     for (let i = 1; i < allChunks.length; i++) {
       const overlapText = allChunks[i - 1].content.slice(-OVERLAP_CHARS)

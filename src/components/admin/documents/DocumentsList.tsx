@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import { FileText, Loader2, CheckCircle2, XCircle, Clock, Plus, Trash2, RefreshCw, Layers } from 'lucide-react'
+import { FileText, Loader2, CheckCircle2, XCircle, Clock, Plus, Trash2, RefreshCw, Layers, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { UploadDocumentModal } from './UploadDocumentModal'
 import { DocumentChunksDrawer } from './DocumentChunksDrawer'
@@ -116,8 +116,13 @@ export function DocumentsList({ documents }: { documents: CcrDocument[] }) {
       ) : (
         <div className="space-y-3">
           {documents.map((doc) => {
+            const isEmptyCompleted = doc.status === 'completed' && (doc.chunk_count ?? 0) === 0
             const cfg = statusConfig[doc.status]
-            const Icon = cfg.icon
+            const Icon = isEmptyCompleted ? AlertTriangle : cfg.icon
+            const badgeClass = isEmptyCompleted
+              ? 'text-amber-600 bg-amber-50 border-amber-200'
+              : cfg.className
+            const badgeLabel = isEmptyCompleted ? 'Empty' : cfg.label
             const busy = busyId === doc.id
             const isProcessing = doc.status === 'processing' || doc.status === 'pending'
 
@@ -135,27 +140,32 @@ export function DocumentsList({ documents }: { documents: CcrDocument[] }) {
                         <span
                           className={cn(
                             'inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border',
-                            cfg.className
+                            badgeClass
                           )}
                         >
                           <Icon className={cn('h-3 w-3', isProcessing && 'animate-spin')} />
-                          {cfg.label}
+                          {badgeLabel}
                         </span>
                       </div>
 
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        {doc.status === 'completed' && (
+                        {doc.status === 'completed' && !isEmptyCompleted && (
                           <>
                             <span>{doc.chunk_count ?? 0} sections indexed</span>
                             {doc.page_count && <span>{doc.page_count} pages</span>}
                           </>
+                        )}
+                        {isEmptyCompleted && (
+                          <span className="text-amber-600">
+                            No text extracted — PDF may be scanned. Click Retry to reprocess with OCR.
+                          </span>
                         )}
                         {doc.status === 'failed' && doc.error_message && (
                           <span className="text-red-500 truncate max-w-64" title={doc.error_message}>
                             {doc.error_message}
                           </span>
                         )}
-                        {doc.status === 'completed' && doc.processed_at && (
+                        {doc.status === 'completed' && !isEmptyCompleted && doc.processed_at && (
                           <span>Indexed {new Date(doc.processed_at).toLocaleDateString()}</span>
                         )}
                         {(doc.status === 'pending' || doc.status === 'processing') && (
@@ -165,7 +175,7 @@ export function DocumentsList({ documents }: { documents: CcrDocument[] }) {
                     </div>
 
                     <div className="flex gap-2 shrink-0">
-                      {doc.status === 'completed' && (
+                      {doc.status === 'completed' && !isEmptyCompleted && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -176,7 +186,7 @@ export function DocumentsList({ documents }: { documents: CcrDocument[] }) {
                           Chunks
                         </Button>
                       )}
-                      {doc.status === 'failed' && (
+                      {(doc.status === 'failed' || isEmptyCompleted) && (
                         <Button
                           variant="outline"
                           size="sm"

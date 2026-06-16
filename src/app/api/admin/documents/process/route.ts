@@ -7,10 +7,12 @@
 
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import OpenAI from 'openai'
+import { generateText } from 'ai'
+import { anthropic } from '@ai-sdk/anthropic'
 import { extractText, getDocumentProxy } from 'unpdf'
 import type { Profile } from '@/types/database'
 
-export const maxDuration = 60
+export const maxDuration = 120
 
 // ── Constants (mirror the Edge Function) ──────────────────────────────────
 
@@ -157,6 +159,21 @@ async function processDocument(
   }
   allChunks.forEach((c, i) => { c.chunk_index = i })
 
+  // Guard: if OCR was needed but produced no chunks, fail loudly so the user can retry
+  if (allChunks.length === 0) {
+    await serviceClient
+      .from('ccr_documents')
+      .update({
+        status: 'failed',
+        error_message: isOcr
+          ? 'OCR ran but no text was extracted. The PDF may be corrupted or in an unsupported format.'
+          : 'No text found in PDF. The document may be a scanned image — retry to attempt OCR.',
+        page_count: pages.length,
+      })
+      .eq('id', docId)
+    return { chunks: 0, pages: pages.length, isOcr }
+  }
+
   // Inject backward overlap into embed_content
   for (let i = 1; i < allChunks.length; i++) {
     const overlap = allChunks[i - 1].content.slice(-OVERLAP_CHARS)
@@ -196,12 +213,9 @@ async function processDocument(
   return { chunks: allChunks.length, pages: pages.length, isOcr }
 }
 
-// ── PDF Extraction ─────────────────────────────────────────────────────────
-// This route handles text-based PDFs via unpdf. Scanned PDFs requiring OCR
-// are handled by the Edge Function (process-document) which has the raw
-// Anthropic SDK available. If a document is detected as scanned, we still
-// extract whatever text unpdf can find — it won't be perfect but is better
-// than leaving the document in 'pending' state.
+// ── PDF Extraction + OCR ───────────────────────────────────────────────────
+
+const OCR_BLOCK_SIZE = 40  // pages per Claude OCR call (Haiku max output ~8192 tokens)
 
 async function extractPages(
   pdfBuffer: ArrayBuffer
@@ -209,7 +223,7 @@ async function extractPages(
   const pdf = await getDocumentProxy(new Uint8Array(pdfBuffer))
   const { text: pageTexts } = await extractText(pdf, { mergePages: false })
 
-  const pages: PageContent[] = (pageTexts as string[]).map((text, idx) => ({
+  let pages: PageContent[] = (pageTexts as string[]).map((text, idx) => ({
     pageNumber: idx + 1,
     text,
     isImageOnly: text.trim().length < SCANNED_PAGE_THRESHOLD,
@@ -218,9 +232,58 @@ async function extractPages(
   const imageOnlyCount = pages.filter(p => p.isImageOnly).length
   const isOcr = imageOnlyCount / Math.max(pages.length, 1) > 0.3
 
-  // For scanned PDFs, we process with the text we have (incomplete).
-  // The Edge Function can re-process with full OCR if needed.
+  if (isOcr && process.env.ANTHROPIC_API_KEY) {
+    const base64 = bufferToBase64(pdfBuffer)
+    let allLines: string[] = []
+
+    for (let start = 1; start <= pages.length; start += OCR_BLOCK_SIZE) {
+      const end = Math.min(start + OCR_BLOCK_SIZE - 1, pages.length)
+      const text = await ocrPageRange(base64, start, end)
+      allLines.push(...text.split('\n'))
+    }
+
+    const linesPerPage = Math.max(1, Math.ceil(allLines.length / pages.length))
+    pages = pages.map((page, idx) => ({
+      ...page,
+      text: allLines.slice(idx * linesPerPage, (idx + 1) * linesPerPage).join('\n'),
+      isImageOnly: false,
+    }))
+  }
+
   return { pages, isOcr }
+}
+
+function bufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer)
+  const CHUNK = 32768
+  let binary = ''
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + CHUNK, bytes.length)))
+  }
+  return btoa(binary)
+}
+
+async function ocrPageRange(base64Pdf: string, startPage: number, endPage: number): Promise<string> {
+  const rangeNote = startPage === endPage ? `page ${startPage}` : `pages ${startPage} through ${endPage}`
+  const { text } = await generateText({
+    model: anthropic('claude-haiku-4-5-20251001'),
+    maxTokens: 8192,
+    messages: [{
+      role: 'user',
+      content: [
+        {
+          type: 'file',
+          data: base64Pdf,
+          mimeType: 'application/pdf',
+        },
+        {
+          type: 'text',
+          text: `Extract the text from ${rangeNote} of this document verbatim. Preserve article and section headings exactly as written. Output only the extracted text.`,
+        },
+      ],
+    }],
+  })
+  return text
 }
 
 // ── Hierarchy Parsing ──────────────────────────────────────────────────────

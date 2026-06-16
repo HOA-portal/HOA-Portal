@@ -110,7 +110,7 @@ export async function POST(
 
   const { data: doc, error: fetchError } = await supabase
     .from('ccr_documents')
-    .select('id, storage_path, status, hoa_id')
+    .select('id, storage_path, status, hoa_id, chunk_count')
     .eq('id', id)
     .single()
 
@@ -118,9 +118,10 @@ export async function POST(
     return Response.json({ error: 'Document not found' }, { status: 404 })
   }
 
-  if (doc.status !== 'failed') {
+  const isEmptyCompleted = doc.status === 'completed' && ((doc.chunk_count ?? 0) === 0)
+  if (doc.status !== 'failed' && !isEmptyCompleted) {
     return Response.json(
-      { error: 'Only documents with status "failed" can be retried' },
+      { error: 'Only failed documents or completed documents with 0 chunks can be retried' },
       { status: 409 }
     )
   }
@@ -158,15 +159,18 @@ export async function POST(
     console.error('[documents/retry] Enqueue failed:', enqueueError)
   }
 
-  // Fire-and-forget edge function trigger
+  // Fire-and-forget: Edge Function (primary) + internal route (fallback)
   const edgeFnUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/process-document`
   fetch(edgeFnUrl, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
-    },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` },
     body: '{}',
+  }).catch(() => {})
+
+  const appOrigin = new URL(_request.url).origin
+  fetch(`${appOrigin}/api/admin/documents/process`, {
+    method: 'POST',
+    headers: { Cookie: _request.headers.get('cookie') ?? '' },
   }).catch(() => {})
 
   return Response.json({ documentId: id, status: 'pending' }, { status: 202 })
