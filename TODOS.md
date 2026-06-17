@@ -4,19 +4,10 @@ Deferred work items. Each entry includes enough context to pick up without re-de
 
 ---
 
-## TODO-1: Fix `relevance` field in `searchHOARules`
+## ~~TODO-1: Fix `relevance` field in `searchHOARules`~~ — DONE (commit 7d41ce5)
 
-**File:** `src/lib/ai/resident-tools.ts`
-
-**What:** `Math.round(rrf_score * 100)` returns 1–3 for all results, which reads as near-zero quality.
-
-**Why:** The `similarity` column returned by `match_ccr_chunks_with_context` is an RRF composite score (`1/(60+vector_rank) + 1/(60+text_rank)`), not cosine similarity. Max value is ~0.033. Multiplying by 100 gives a "relevance" of 1–3, which could make the LLM treat every result as very low quality.
-
-**Fix options:**
-- Replace with a descriptive label (`high`/`medium`/`low`) once TODO-2 thresholds are calibrated
-- Or remove the field entirely from the tool return value if the LLM doesn't use it meaningfully
-
-**Depends on:** TODO-2 (coordinate the fix — both fields should ship together)
+Field removed entirely from `src/lib/ai/resident-tools.ts`. Was returning 1–3 for all results
+(RRF score × 100), misleading the LLM. Removed until TODO-2 calibration is done.
 
 ---
 
