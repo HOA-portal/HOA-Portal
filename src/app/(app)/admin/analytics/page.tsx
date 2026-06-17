@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Search, TrendingUp, BookOpen, AlertCircle } from 'lucide-react'
+import { Search, TrendingUp, BookOpen, AlertCircle, ThumbsUp } from 'lucide-react'
 import type { Profile, RagQueryLog } from '@/types/database'
 
 const DAYS = 30
@@ -23,7 +23,7 @@ export default async function AnalyticsPage() {
 
   const since = new Date(Date.now() - DAYS * 24 * 60 * 60 * 1000).toISOString()
 
-  const [logsRes, topSectionsRes, recentRes] = await Promise.all([
+  const [logsRes, topSectionsRes, recentRes, feedbackRes] = await Promise.all([
     supabase
       .from('rag_query_logs')
       .select('had_results, avg_similarity')
@@ -43,6 +43,13 @@ export default async function AnalyticsPage() {
       .gte('created_at', since)
       .order('created_at', { ascending: false })
       .limit(20),
+    supabase
+      .from('chat_messages')
+      .select('metadata')
+      .eq('hoa_id', profile.hoa_id)
+      .eq('role', 'assistant')
+      .gte('created_at', since)
+      .not('metadata', 'is', null),
   ])
 
   const logs: Pick<RagQueryLog, 'had_results' | 'avg_similarity'>[] = logsRes.data ?? []
@@ -66,6 +73,16 @@ export default async function AnalyticsPage() {
 
   const recentQueries: Pick<RagQueryLog, 'query_text' | 'match_count' | 'top_section_title' | 'avg_similarity' | 'had_results' | 'created_at'>[] =
     recentRes.data ?? []
+
+  let helpfulCount = 0
+  let notHelpfulCount = 0
+  for (const row of (feedbackRes.data ?? [])) {
+    const meta = row.metadata as Record<string, unknown> | null
+    if (meta?.helpful === true) helpfulCount++
+    else if (meta?.helpful === false) notHelpfulCount++
+  }
+  const totalRated = helpfulCount + notHelpfulCount
+  const helpfulPct = totalRated > 0 ? Math.round((helpfulCount / totalRated) * 100) : null
 
   return (
     <div className="flex-1 overflow-auto">
@@ -111,6 +128,28 @@ export default async function AnalyticsPage() {
                 <span className="text-xs text-muted-foreground">Avg Relevance</span>
               </div>
               <p className="text-2xl font-bold text-slate-900">{avgSim !== null ? `${avgSim}%` : '—'}</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Feedback card */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+          <Card className="border-slate-200">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <ThumbsUp className="h-4 w-4 text-green-500" />
+                <span className="text-xs text-muted-foreground">Helpful Responses (30d)</span>
+              </div>
+              {totalRated === 0 ? (
+                <p className="text-2xl font-bold text-slate-900">—</p>
+              ) : (
+                <>
+                  <p className="text-2xl font-bold text-slate-900">{helpfulPct}%</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {helpfulCount} helpful · {notHelpfulCount} not helpful · {totalRated} rated
+                  </p>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>

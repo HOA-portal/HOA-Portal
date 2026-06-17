@@ -11,6 +11,7 @@ import { generateText } from 'ai'
 import { anthropic } from '@ai-sdk/anthropic'
 import { extractText, getDocumentProxy } from 'unpdf'
 import type { Profile } from '@/types/database'
+import { withRetry } from '@/lib/utils/retry'
 
 export const maxDuration = 120
 
@@ -133,7 +134,7 @@ async function processDocument(
   docId: string,
   hoaId: string,
   storagePath: string
-): Promise<{ chunks: number; pages: number; isOcr: boolean }> {
+): Promise<{ chunks: number; pages: number; isOcr: boolean; embeddingTokens: number; ocrTokens: number }> {
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
 
   // Download from storage
@@ -149,7 +150,9 @@ async function processDocument(
   const pdfBuffer = await (fileBlob as Blob).arrayBuffer()
 
   // Extract pages (with OCR fallback)
-  const { pages, isOcr } = await extractPages(pdfBuffer)
+  let ocrTokens = 0
+  const { pages, isOcr, ocrTokens: extractedOcrTokens } = await extractPages(pdfBuffer)
+  ocrTokens += extractedOcrTokens
 
   // Parse CC&R hierarchy
   const sections = parseHierarchy(pages)
@@ -169,9 +172,10 @@ async function processDocument(
           ? 'OCR ran but no text was extracted. The PDF may be corrupted or in an unsupported format.'
           : 'No text found in PDF. The document may be a scanned image — retry to attempt OCR.',
         page_count: pages.length,
+        ocr_tokens: ocrTokens,
       })
       .eq('id', docId)
-    return { chunks: 0, pages: pages.length, isOcr }
+    return { chunks: 0, pages: pages.length, isOcr, embeddingTokens: 0, ocrTokens }
   }
 
   // Inject backward overlap into embed_content
@@ -181,7 +185,7 @@ async function processDocument(
   }
 
   // Embed all chunks in one batched call
-  const embeddings = await embedBatch(openai, allChunks.map(c => c.embed_content))
+  const { embeddings, totalTokens: embeddingTokens } = await embedBatch(openai, allChunks.map(c => c.embed_content))
 
   // Bulk insert in batches of INSERT_BATCH
   for (let i = 0; i < allChunks.length; i += INSERT_BATCH) {
@@ -207,10 +211,12 @@ async function processDocument(
       chunk_count: allChunks.length,
       processed_at: new Date().toISOString(),
       error_message: null,
+      embedding_tokens: embeddingTokens,
+      ocr_tokens: ocrTokens,
     })
     .eq('id', docId)
 
-  return { chunks: allChunks.length, pages: pages.length, isOcr }
+  return { chunks: allChunks.length, pages: pages.length, isOcr, embeddingTokens, ocrTokens }
 }
 
 // ── PDF Extraction + OCR ───────────────────────────────────────────────────
@@ -219,7 +225,7 @@ const OCR_BLOCK_SIZE = 40  // pages per Claude OCR call (Haiku max output ~8192 
 
 async function extractPages(
   pdfBuffer: ArrayBuffer
-): Promise<{ pages: PageContent[]; isOcr: boolean }> {
+): Promise<{ pages: PageContent[]; isOcr: boolean; ocrTokens: number }> {
   const pdf = await getDocumentProxy(new Uint8Array(pdfBuffer))
   const { text: pageTexts } = await extractText(pdf, { mergePages: false })
 
@@ -231,6 +237,7 @@ async function extractPages(
 
   const imageOnlyCount = pages.filter(p => p.isImageOnly).length
   const isOcr = imageOnlyCount / Math.max(pages.length, 1) > 0.3
+  let ocrTokens = 0
 
   if (isOcr && process.env.ANTHROPIC_API_KEY) {
     const base64 = bufferToBase64(pdfBuffer)
@@ -238,8 +245,9 @@ async function extractPages(
 
     for (let start = 1; start <= pages.length; start += OCR_BLOCK_SIZE) {
       const end = Math.min(start + OCR_BLOCK_SIZE - 1, pages.length)
-      const text = await ocrPageRange(base64, start, end)
+      const { text, outputTokens } = await ocrPageRange(base64, start, end)
       allLines.push(...text.split('\n'))
+      ocrTokens += outputTokens
     }
 
     const linesPerPage = Math.max(1, Math.ceil(allLines.length / pages.length))
@@ -250,7 +258,7 @@ async function extractPages(
     }))
   }
 
-  return { pages, isOcr }
+  return { pages, isOcr, ocrTokens }
 }
 
 function bufferToBase64(buffer: ArrayBuffer): string {
@@ -263,9 +271,13 @@ function bufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary)
 }
 
-async function ocrPageRange(base64Pdf: string, startPage: number, endPage: number): Promise<string> {
+async function ocrPageRange(
+  base64Pdf: string,
+  startPage: number,
+  endPage: number
+): Promise<{ text: string; outputTokens: number }> {
   const rangeNote = startPage === endPage ? `page ${startPage}` : `pages ${startPage} through ${endPage}`
-  const { text } = await generateText({
+  const result = await withRetry(() => generateText({
     model: anthropic('claude-haiku-4-5-20251001'),
     maxTokens: 8192,
     messages: [{
@@ -282,8 +294,8 @@ async function ocrPageRange(base64Pdf: string, startPage: number, endPage: numbe
         },
       ],
     }],
-  })
-  return text
+  }))
+  return { text: result.text, outputTokens: result.usage?.completionTokens ?? 0 }
 }
 
 // ── Hierarchy Parsing ──────────────────────────────────────────────────────
@@ -407,13 +419,20 @@ function chunkSection(section: HierarchicalSection, isOcr: boolean, storagePath:
 
 // ── Embedding ──────────────────────────────────────────────────────────────
 
-async function embedBatch(openai: OpenAI, texts: string[]): Promise<number[][]> {
+async function embedBatch(
+  openai: OpenAI,
+  texts: string[]
+): Promise<{ embeddings: number[][]; totalTokens: number }> {
   const MAX_BATCH = 2048
-  const results: number[][] = []
+  const embeddings: number[][] = []
+  let totalTokens = 0
   for (let i = 0; i < texts.length; i += MAX_BATCH) {
     const batch = texts.slice(i, i + MAX_BATCH)
-    const res = await openai.embeddings.create({ model: 'text-embedding-3-small', input: batch, dimensions: 1536 })
-    results.push(...res.data.map(d => d.embedding))
+    const res = await withRetry(() =>
+      openai.embeddings.create({ model: 'text-embedding-3-small', input: batch, dimensions: 1536 })
+    )
+    embeddings.push(...res.data.map(d => d.embedding))
+    totalTokens += res.usage?.total_tokens ?? 0
   }
-  return results
+  return { embeddings, totalTokens }
 }

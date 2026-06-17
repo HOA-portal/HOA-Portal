@@ -25,6 +25,8 @@ import {
   BookOpen,
   ChevronDown,
   ChevronUp,
+  ThumbsUp,
+  ThumbsDown,
 } from 'lucide-react'
 
 interface ChatInterfaceProps {
@@ -42,7 +44,7 @@ interface ToolResultData {
   complaintId?: string
   violationId?: string
   found?: boolean
-  results?: Array<{ section: string; content: string; relevance: number }>
+  results?: Array<{ section: string; content: string }>
   amenities?: Array<{ id: string; name: string; description: string | null }>
   workOrders?: Array<{ id: string; title: string; status: string; priority: string }>
   bookings?: Array<{ id: string; date: string; start_time: string; end_time: string }>
@@ -78,15 +80,6 @@ function SearchHOARulesCard({ result }: { result: ToolResultData }) {
           <div key={i} className="bg-white/70 rounded-md border border-blue-100 p-2.5">
             <div className="flex items-center justify-between gap-2 mb-1">
               <span className="font-medium text-blue-900 text-xs leading-tight">{r.section}</span>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <div className="w-12 h-1.5 bg-blue-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-blue-400 rounded-full transition-all"
-                    style={{ width: `${r.relevance}%` }}
-                  />
-                </div>
-                <span className="text-[10px] text-blue-500 tabular-nums">{r.relevance}%</span>
-              </div>
             </div>
             <p className={cn('text-blue-800 text-xs leading-relaxed', !isExpanded && isLong && 'line-clamp-2')}>
               {r.content}
@@ -214,8 +207,19 @@ function ToolResultCard({ toolName, result }: { toolName: string; result: ToolRe
   return null
 }
 
-function MessageBubble({ message }: { message: Message }) {
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+function MessageBubble({
+  message,
+  onFeedback,
+  feedbackSent,
+}: {
+  message: Message
+  onFeedback: (messageId: string, helpful: boolean) => void
+  feedbackSent: Set<string>
+}) {
   const isUser = message.role === 'user'
+  const showFeedback = !isUser && UUID_RE.test(message.id) && !feedbackSent.has(message.id)
 
   return (
     <div className={cn('flex gap-3', isUser ? 'flex-row-reverse' : 'flex-row')}>
@@ -282,6 +286,26 @@ function MessageBubble({ message }: { message: Message }) {
             <p className="whitespace-pre-wrap">{typeof message.content === 'string' ? message.content : ''}</p>
           </div>
         )}
+        {showFeedback && (
+          <div className="flex gap-1">
+            <button
+              type="button"
+              onClick={() => onFeedback(message.id, true)}
+              className="p-1 rounded text-slate-400 hover:text-green-600 hover:bg-green-50 transition-colors"
+              title="Helpful"
+            >
+              <ThumbsUp className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onFeedback(message.id, false)}
+              className="p-1 rounded text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+              title="Not helpful"
+            >
+              <ThumbsDown className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -293,6 +317,16 @@ export default function ChatInterface({ profile, sessionId, initialMessages = []
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [attachmentUrls, setAttachmentUrls] = useState<string[]>([])
   const [uploading, setUploading] = useState(false)
+  const [feedbackSent, setFeedbackSent] = useState<Set<string>>(new Set())
+
+  async function sendFeedback(messageId: string, helpful: boolean) {
+    setFeedbackSent(prev => new Set([...prev, messageId]))
+    await fetch(`/api/chat/messages/${messageId}/feedback`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ helpful }),
+    })
+  }
 
   const { messages, input, handleInputChange, handleSubmit, isLoading, setInput } = useChat({
     api: apiRoute,
@@ -402,7 +436,12 @@ export default function ChatInterface({ profile, sessionId, initialMessages = []
 
         <div className="space-y-4 pb-2">
           {messages.map((message) => (
-            <MessageBubble key={message.id} message={message} />
+            <MessageBubble
+              key={message.id}
+              message={message}
+              onFeedback={sendFeedback}
+              feedbackSent={feedbackSent}
+            />
           ))}
           {isLoading && (
             <div className="flex gap-3">

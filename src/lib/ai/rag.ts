@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import OpenAI from 'openai'
 import { generateText } from 'ai'
 import { anthropic } from '@ai-sdk/anthropic'
+import { withRetry } from '@/lib/utils/retry'
 
 function getOpenAI() {
   return new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -42,14 +43,14 @@ export function buildPassage(chunk: RagChunk): string {
  */
 async function hydeExpand(query: string): Promise<string> {
   try {
-    const { text } = await generateText({
+    const { text } = await withRetry(() => generateText({
       model: anthropic('claude-haiku-4-5-20251001'),
       maxTokens: 150,
       messages: [{
         role: 'user',
         content: `Write a 2-3 sentence HOA CC&R rule that directly addresses this question: "${query}"\n\nWrite only the rule text, using formal legal language as it would appear in a CC&R document. Do not include preamble or explanation.`,
       }],
-    })
+    }))
     return text.trim() || query
   } catch {
     return query
@@ -74,14 +75,14 @@ async function rerankChunks(
   ).join('\n\n')
 
   try {
-    const { text } = await generateText({
+    const { text } = await withRetry(() => generateText({
       model: anthropic('claude-haiku-4-5-20251001'),
       maxTokens: 60,
       messages: [{
         role: 'user',
         content: `Resident question: "${query}"\n\nRank these CC&R sections by relevance. Reply with only the numbers in order from most to least relevant, comma-separated (e.g.: 3,1,5,2,4).\n\n${numbered}`,
       }],
-    })
+    }))
     const indices = text.match(/\d+/g)?.map(Number) ?? []
     const seen = new Set<number>()
     const reranked = indices

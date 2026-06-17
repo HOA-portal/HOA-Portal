@@ -44,7 +44,6 @@ export function buildResidentTools(profile: Profile) {
           results: chunks.map((c) => ({
             section: c.section_title ?? 'General Rules',
             content: buildPassage(c),
-            relevance: Math.round(c.similarity * 100),
           })),
         }
       },

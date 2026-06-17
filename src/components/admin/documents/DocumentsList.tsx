@@ -153,6 +153,14 @@ export function DocumentsList({ documents }: { documents: CcrDocument[] }) {
                           <>
                             <span>{doc.chunk_count ?? 0} sections indexed</span>
                             {doc.page_count && <span>{doc.page_count} pages</span>}
+                            {(doc.embedding_tokens > 0 || doc.ocr_tokens > 0) && (
+                              <span title={`${doc.embedding_tokens} embedding tokens, ${doc.ocr_tokens} OCR tokens`}>
+                                ~{(
+                                  doc.embedding_tokens * 0.000002 +
+                                  doc.ocr_tokens * 0.000025
+                                ).toFixed(3)}¢
+                              </span>
+                            )}
                           </>
                         )}
                         {isEmptyCompleted && (

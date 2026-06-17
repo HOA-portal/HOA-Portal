@@ -191,6 +191,8 @@ export interface Database {
           processed_at: string | null
           created_at: string
           last_queued_at: string | null
+          embedding_tokens: number
+          ocr_tokens: number
         }
         Insert: {
           id?: string
@@ -205,6 +207,8 @@ export interface Database {
           processed_at?: string | null
           created_at?: string
           last_queued_at?: string | null
+          embedding_tokens?: number
+          ocr_tokens?: number
         }
         Update: {
           id?: string
@@ -219,6 +223,8 @@ export interface Database {
           processed_at?: string | null
           created_at?: string
           last_queued_at?: string | null
+          embedding_tokens?: number
+          ocr_tokens?: number
         }
       }
       ccr_chunks: {
