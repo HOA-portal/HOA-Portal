@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { parseFinancialStatementPDF } from '@/lib/ai/financial-parser'
 import type { Profile } from '@/types/database'
 
@@ -49,9 +49,21 @@ export async function POST(request: Request): Promise<Response> {
   const hoaId = profile.hoa_id
   const storagePath = `${hoaId}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
 
-  const { error: storageError } = await supabase.storage
+  let { error: storageError } = await supabase.storage
     .from('financial-statements')
     .upload(storagePath, file)
+
+  // Bucket may not exist yet (migration not applied, or remote project without manual setup).
+  // Auto-create it with the service role and retry once.
+  if (storageError && /bucket not found/i.test(storageError.message)) {
+    const serviceClient = await createServiceClient()
+    await serviceClient.storage.createBucket('financial-statements', {
+      public: false,
+      allowedMimeTypes: ['application/pdf'],
+    })
+    const retry = await supabase.storage.from('financial-statements').upload(storagePath, file)
+    storageError = retry.error ?? null
+  }
 
   if (storageError) {
     return Response.json({ error: `Storage upload failed: ${storageError.message}` }, { status: 500 })

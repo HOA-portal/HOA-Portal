@@ -34,7 +34,7 @@ export async function parseFinancialStatementPDF(
 }
 
 async function ocrPdfText(pdfBuffer: ArrayBuffer): Promise<string> {
-  const base64 = bufferToBase64(pdfBuffer)
+  const base64Pdf = bufferToBase64(pdfBuffer)
   const { text } = await generateText({
     model: anthropic('claude-haiku-4-5-20251001'),
     messages: [
@@ -43,7 +43,7 @@ async function ocrPdfText(pdfBuffer: ArrayBuffer): Promise<string> {
         content: [
           {
             type: 'file',
-            data: base64,
+            data: base64Pdf,
             mimeType: 'application/pdf',
           },
           {
@@ -67,12 +67,28 @@ function bufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary)
 }
 
+// Extracts the first complete JSON object from arbitrary text using a bracket counter.
+// Safer than a greedy regex when Claude includes surrounding explanation.
+function extractFirstJson(text: string): string | null {
+  const start = text.indexOf('{')
+  if (start === -1) return null
+  let depth = 0
+  for (let i = start; i < text.length; i++) {
+    if (text[i] === '{') depth++
+    else if (text[i] === '}') {
+      depth--
+      if (depth === 0) return text.slice(start, i + 1)
+    }
+  }
+  return null
+}
+
 async function extractStructuredData(text: string): Promise<ParsedStatement> {
   const prompt = `You are parsing a HOA (Homeowners Association) financial statement PDF.
 
 Extract financial data ONLY from the Income Statement or Cash Flow section (NOT from the Balance Sheet, Dues Roll, Work Orders, or vendor invoices).
 
-Return a JSON object with exactly this structure:
+Output ONLY the JSON object below — no explanation, no markdown, no code fences:
 {
   "year": <integer, e.g. 2026>,
   "month": <integer 1-12, e.g. 4 for April>,
@@ -105,10 +121,10 @@ ${text.slice(0, 12000)}`
     messages: [{ role: 'user', content: prompt }],
   })
 
-  const jsonMatch = raw.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) throw new Error('Claude did not return valid JSON')
+  const jsonStr = extractFirstJson(raw)
+  if (!jsonStr) throw new Error('Claude did not return a JSON object')
 
-  const parsed = JSON.parse(jsonMatch[0])
+  const parsed = JSON.parse(jsonStr)
   if (parsed.error) throw new Error(`Claude parsing error: ${parsed.error}`)
 
   return parsed as ParsedStatement

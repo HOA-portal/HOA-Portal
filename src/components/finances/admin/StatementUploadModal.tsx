@@ -65,6 +65,12 @@ export function StatementUploadModal({ open, onClose, onParsed }: Props) {
       }
     })
 
+    // Bytes fully sent — server is now parsing with Claude (can take 10-30s)
+    xhr.upload.addEventListener('load', () => {
+      setPhase('parsing')
+      setUploadProgress(90)
+    })
+
     xhr.addEventListener('load', () => {
       if (xhr.status === 200) {
         setPhase('parsing')
