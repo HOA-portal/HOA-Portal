@@ -2,12 +2,14 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus } from 'lucide-react'
+import { Plus, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { BalanceSummaryCard } from '@/components/finances/BalanceSummaryCard'
 import { PeriodAccordion, type PeriodWithEntries } from '@/components/finances/PeriodAccordion'
 import { EntryFormModal } from '@/components/finances/admin/EntryFormModal'
+import { StatementUploadModal } from '@/components/finances/admin/StatementUploadModal'
+import { StatementReviewModal } from '@/components/finances/admin/StatementReviewModal'
 import {
   computeRunningBalance,
   computeTotalIncome,
@@ -15,6 +17,7 @@ import {
 } from '@/lib/utils/finance'
 import { createFinancialPeriod, closePeriod, deleteFinancialEntry } from '@/app/(app)/admin/actions'
 import type { FinancialCategory } from '@/types/database'
+import type { ParsedStatement } from '@/lib/ai/financial-parser-types'
 
 interface Props {
   periods: PeriodWithEntries[]
@@ -25,6 +28,8 @@ export function FinancesManager({ periods, categories }: Props) {
   const router = useRouter()
   const [entryModalPeriodId, setEntryModalPeriodId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [uploadOpen, setUploadOpen] = useState(false)
+  const [reviewData, setReviewData] = useState<{ statementId: string; parsed: ParsedStatement } | null>(null)
 
   const balance = computeRunningBalance(periods)
   const totalIncome = computeTotalIncome(periods)
@@ -87,12 +92,18 @@ export function FinancesManager({ periods, categories }: Props) {
       {/* Header row */}
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-medium text-slate-700">Períodos mensais</h2>
-        {!hasCurrentMonth && (
-          <Button size="sm" onClick={handleCreatePeriod} disabled={loading}>
-            <Plus className="h-4 w-4 mr-1" />
-            Novo período
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => setUploadOpen(true)}>
+            <Upload className="h-4 w-4 mr-1" />
+            Importar Extrato PDF
           </Button>
-        )}
+          {!hasCurrentMonth && (
+            <Button size="sm" onClick={handleCreatePeriod} disabled={loading}>
+              <Plus className="h-4 w-4 mr-1" />
+              Novo período
+            </Button>
+          )}
+        </div>
       </div>
 
       <PeriodAccordion
@@ -108,6 +119,22 @@ export function FinancesManager({ periods, categories }: Props) {
           open={!!entryModalPeriodId}
           onClose={() => setEntryModalPeriodId(null)}
           periodId={entryModalPeriodId}
+          categories={categories}
+        />
+      )}
+
+      <StatementUploadModal
+        open={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        onParsed={(statementId, parsed) => setReviewData({ statementId, parsed })}
+      />
+
+      {reviewData && (
+        <StatementReviewModal
+          open={!!reviewData}
+          onClose={() => setReviewData(null)}
+          statementId={reviewData.statementId}
+          parsed={reviewData.parsed}
           categories={categories}
         />
       )}

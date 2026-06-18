@@ -1,6 +1,7 @@
 export type UserRole = 'resident' | 'admin'
 export type FinancialPeriodStatus = 'open' | 'closed'
 export type FinancialEntryType = 'income' | 'expense'
+export type FinancialStatementStatus = 'pending' | 'processing' | 'review' | 'imported' | 'failed'
 export type ResidentStatus = 'active' | 'invited' | 'inactive'
 export type DocumentStatus = 'pending' | 'processing' | 'completed' | 'failed'
 export type WorkOrderStatus = 'open' | 'in_progress' | 'resolved' | 'closed'
@@ -755,6 +756,53 @@ export interface Database {
           updated_at?: string
         }
       }
+      financial_statements: {
+        Row: {
+          id: string
+          hoa_id: string
+          filename: string
+          storage_path: string
+          year: number | null
+          month: number | null
+          status: FinancialStatementStatus
+          parsed_data: Record<string, unknown> | null
+          error_message: string | null
+          uploaded_by: string
+          imported_period_id: string | null
+          created_at: string
+          processed_at: string | null
+        }
+        Insert: {
+          id?: string
+          hoa_id: string
+          filename: string
+          storage_path: string
+          year?: number | null
+          month?: number | null
+          status?: FinancialStatementStatus
+          parsed_data?: Record<string, unknown> | null
+          error_message?: string | null
+          uploaded_by: string
+          imported_period_id?: string | null
+          created_at?: string
+          processed_at?: string | null
+        }
+        Update: {
+          id?: string
+          hoa_id?: string
+          filename?: string
+          storage_path?: string
+          year?: number | null
+          month?: number | null
+          status?: FinancialStatementStatus
+          parsed_data?: Record<string, unknown> | null
+          error_message?: string | null
+          uploaded_by?: string
+          imported_period_id?: string | null
+          created_at?: string
+          processed_at?: string | null
+        }
+      }
       rag_query_logs: {
         Row: {
           id: string
@@ -902,3 +950,4 @@ export type CrmIntegration = Database['public']['Tables']['crm_integrations']['R
 export type FinancialCategory = Database['public']['Tables']['financial_categories']['Row']
 export type FinancialPeriod = Database['public']['Tables']['financial_periods']['Row']
 export type FinancialEntry = Database['public']['Tables']['financial_entries']['Row']
+export type FinancialStatement = Database['public']['Tables']['financial_statements']['Row']
