@@ -1,4 +1,6 @@
 export type UserRole = 'resident' | 'admin'
+export type FinancialPeriodStatus = 'open' | 'closed'
+export type FinancialEntryType = 'income' | 'expense'
 export type ResidentStatus = 'active' | 'invited' | 'inactive'
 export type DocumentStatus = 'pending' | 'processing' | 'completed' | 'failed'
 export type WorkOrderStatus = 'open' | 'in_progress' | 'resolved' | 'closed'
@@ -233,6 +235,7 @@ export interface Database {
           hoa_id: string
           document_id: string
           content: string
+          content_hash: string
           section_title: string | null
           embedding: number[] | null
           chunk_index: number
@@ -244,6 +247,7 @@ export interface Database {
           hoa_id: string
           document_id: string
           content: string
+          content_hash: string
           section_title?: string | null
           embedding?: number[] | null
           chunk_index: number
@@ -255,10 +259,40 @@ export interface Database {
           hoa_id?: string
           document_id?: string
           content?: string
+          content_hash?: string
           section_title?: string | null
           embedding?: number[] | null
           chunk_index?: number
           metadata?: Record<string, unknown>
+          created_at?: string
+        }
+      }
+      rag_chunk_hits: {
+        Row: {
+          id: string
+          hoa_id: string
+          chunk_id: string
+          query_log_id: string | null
+          rank_position: number
+          similarity: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          hoa_id: string
+          chunk_id: string
+          query_log_id?: string | null
+          rank_position: number
+          similarity?: number | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          hoa_id?: string
+          chunk_id?: string
+          query_log_id?: string | null
+          rank_position?: number
+          similarity?: number | null
           created_at?: string
         }
       }
@@ -554,6 +588,129 @@ export interface Database {
           updated_at?: string
         }
       }
+      financial_categories: {
+        Row: {
+          id: string
+          hoa_id: string
+          name: string
+          type: 'income' | 'expense'
+          sort_order: number
+          is_active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          hoa_id: string
+          name: string
+          type: 'income' | 'expense'
+          sort_order?: number
+          is_active?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          hoa_id?: string
+          name?: string
+          type?: 'income' | 'expense'
+          sort_order?: number
+          is_active?: boolean
+          created_at?: string
+        }
+      }
+      financial_periods: {
+        Row: {
+          id: string
+          hoa_id: string
+          year: number
+          month: number
+          status: FinancialPeriodStatus
+          total_income: number
+          total_expenses: number
+          notes: string | null
+          closed_by: string | null
+          closed_at: string | null
+          created_by: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          hoa_id: string
+          year: number
+          month: number
+          status?: FinancialPeriodStatus
+          total_income?: number
+          total_expenses?: number
+          notes?: string | null
+          closed_by?: string | null
+          closed_at?: string | null
+          created_by: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          hoa_id?: string
+          year?: number
+          month?: number
+          status?: FinancialPeriodStatus
+          total_income?: number
+          total_expenses?: number
+          notes?: string | null
+          closed_by?: string | null
+          closed_at?: string | null
+          created_by?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      financial_entries: {
+        Row: {
+          id: string
+          hoa_id: string
+          period_id: string
+          category_id: string
+          type: FinancialEntryType
+          description: string
+          amount: number
+          entry_date: string
+          vendor: string | null
+          receipt_url: string | null
+          created_by: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          hoa_id: string
+          period_id: string
+          category_id: string
+          type: FinancialEntryType
+          description: string
+          amount: number
+          entry_date: string
+          vendor?: string | null
+          receipt_url?: string | null
+          created_by: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          hoa_id?: string
+          period_id?: string
+          category_id?: string
+          type?: FinancialEntryType
+          description?: string
+          amount?: number
+          entry_date?: string
+          vendor?: string | null
+          receipt_url?: string | null
+          created_by?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
       rag_query_logs: {
         Row: {
           id: string
@@ -643,6 +800,10 @@ export interface Database {
         }
         Returns: number
       }
+      seed_default_financial_categories: {
+        Args: { p_hoa_id: string; p_admin_id: string }
+        Returns: void
+      }
       get_invitation_by_token: {
         Args: { p_token: string }
         Returns: Array<{
@@ -670,6 +831,8 @@ export interface Database {
       violation_status: 'draft' | 'issued' | 'appealed' | 'resolved' | 'closed'
       message_role: 'user' | 'assistant' | 'tool'
       announcement_status: 'draft' | 'published'
+      financial_period_status: 'open' | 'closed'
+      financial_entry_type: 'income' | 'expense'
     }
     Views: Record<string, never>
     CompositeTypes: Record<string, never>
@@ -692,3 +855,6 @@ export type Announcement = Database['public']['Tables']['announcements']['Row']
 export type RagQueryLog = Database['public']['Tables']['rag_query_logs']['Row']
 export type ResidentInvitation = Database['public']['Tables']['resident_invitations']['Row']
 export type CrmIntegration = Database['public']['Tables']['crm_integrations']['Row']
+export type FinancialCategory = Database['public']['Tables']['financial_categories']['Row']
+export type FinancialPeriod = Database['public']['Tables']['financial_periods']['Row']
+export type FinancialEntry = Database['public']['Tables']['financial_entries']['Row']

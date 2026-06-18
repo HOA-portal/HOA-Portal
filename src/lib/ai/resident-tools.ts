@@ -299,5 +299,169 @@ export function buildResidentTools(profile: Profile) {
         return { bookings: data ?? [] }
       },
     }),
+
+    queryHOAFinancials: tool({
+      description:
+        'Consulta as finanças do condomínio. Use para perguntas sobre saldo atual, resumo mensal (receitas/despesas de um mês), gastos por categoria ou lista de lançamentos. Exemplos: "Qual é o saldo do condomínio?", "Quanto foi gasto em manutenção em março?", "Quais foram as despesas de junho de 2025?".',
+      parameters: z.object({
+        queryType: z
+          .enum(['current_balance', 'period_summary', 'category_breakdown', 'entry_list'])
+          .describe(
+            'Tipo de consulta: current_balance = saldo geral acumulado; period_summary = totais de um mês específico; category_breakdown = gastos por categoria em um mês; entry_list = lançamentos detalhados de um mês',
+          ),
+        year: z.number().optional().describe('Ano (ex: 2025). Obrigatório para period_summary, category_breakdown e entry_list.'),
+        month: z.number().min(1).max(12).optional().describe('Mês como número 1-12. Obrigatório para period_summary, category_breakdown e entry_list.'),
+        category: z.string().optional().describe('Nome da categoria para filtrar (ex: "Manutenção"). Usado em entry_list.'),
+      }),
+      execute: async ({ queryType, year, month, category }) => {
+        const supabase = await createClient() as Db
+
+        if (queryType === 'current_balance') {
+          const { data: periods, error } = await supabase
+            .from('financial_periods')
+            .select('year, month, status, total_income, total_expenses')
+            .eq('hoa_id', hoaId)
+            .order('year', { ascending: false })
+            .order('month', { ascending: false })
+
+          if (error) return { error: 'Não foi possível carregar o saldo financeiro.' }
+          if (!periods?.length) {
+            return { found: false, message: 'Nenhum período financeiro foi registrado ainda. Consulte o administrador do condomínio.' }
+          }
+
+          const totalIncome = periods.reduce((s: number, p: { total_income: number }) => s + Number(p.total_income), 0)
+          const totalExpenses = periods.reduce((s: number, p: { total_expenses: number }) => s + Number(p.total_expenses), 0)
+          const balance = totalIncome - totalExpenses
+          const openPeriod = periods.find((p: { status: string }) => p.status === 'open')
+
+          return {
+            found: true,
+            balance,
+            totalIncome,
+            totalExpenses,
+            periodCount: periods.length,
+            currentOpenPeriod: openPeriod
+              ? { year: openPeriod.year, month: openPeriod.month }
+              : null,
+          }
+        }
+
+        if (queryType === 'period_summary') {
+          if (!year || !month) return { error: 'Ano e mês são necessários para consultar um período específico.' }
+
+          const { data: period, error } = await supabase
+            .from('financial_periods')
+            .select('id, status, total_income, total_expenses')
+            .eq('hoa_id', hoaId)
+            .eq('year', year)
+            .eq('month', month)
+            .single()
+
+          if (error || !period) {
+            return { found: false, message: `Nenhum período financeiro encontrado para ${month}/${year}.` }
+          }
+
+          return {
+            found: true,
+            year,
+            month,
+            status: period.status,
+            totalIncome: Number(period.total_income),
+            totalExpenses: Number(period.total_expenses),
+            balance: Number(period.total_income) - Number(period.total_expenses),
+          }
+        }
+
+        if (queryType === 'category_breakdown') {
+          if (!year || !month) return { error: 'Ano e mês são necessários.' }
+
+          const { data: period } = await supabase
+            .from('financial_periods')
+            .select('id')
+            .eq('hoa_id', hoaId)
+            .eq('year', year)
+            .eq('month', month)
+            .single()
+
+          if (!period) return { found: false, message: `Nenhum período encontrado para ${month}/${year}.` }
+
+          const { data: entries, error } = await supabase
+            .from('financial_entries')
+            .select('type, amount, financial_categories(name)')
+            .eq('period_id', period.id)
+
+          if (error) return { error: 'Não foi possível carregar os lançamentos.' }
+
+          const byCategory: Record<string, { type: string; total: number }> = {}
+          for (const entry of (entries ?? [])) {
+            const catName = (entry.financial_categories as { name: string } | null)?.name ?? 'Outros'
+            if (!byCategory[catName]) byCategory[catName] = { type: entry.type, total: 0 }
+            byCategory[catName].total += Number(entry.amount)
+          }
+
+          return {
+            found: true,
+            year,
+            month,
+            categories: Object.entries(byCategory)
+              .map(([name, v]) => ({ name, type: v.type, total: v.total }))
+              .sort((a, b) => b.total - a.total),
+          }
+        }
+
+        if (queryType === 'entry_list') {
+          if (!year || !month) return { error: 'Ano e mês são necessários.' }
+
+          const { data: period } = await supabase
+            .from('financial_periods')
+            .select('id')
+            .eq('hoa_id', hoaId)
+            .eq('year', year)
+            .eq('month', month)
+            .single()
+
+          if (!period) return { found: false, message: `Nenhum período encontrado para ${month}/${year}.` }
+
+          const { data: entries, error } = await supabase
+            .from('financial_entries')
+            .select('type, description, amount, entry_date, vendor, financial_categories(name)')
+            .eq('period_id', period.id)
+            .order('entry_date', { ascending: true })
+
+          if (error) return { error: 'Não foi possível carregar os lançamentos.' }
+
+          let result = entries ?? []
+          if (category) {
+            const lower = category.toLowerCase()
+            result = result.filter((e: { financial_categories: { name: string } | null }) =>
+              ((e.financial_categories as { name: string } | null)?.name ?? '').toLowerCase().includes(lower),
+            )
+          }
+
+          return {
+            found: true,
+            year,
+            month,
+            entries: result.map((e: {
+              type: string
+              description: string
+              amount: number
+              entry_date: string
+              vendor: string | null
+              financial_categories: { name: string } | null
+            }) => ({
+              type: e.type,
+              description: e.description,
+              amount: Number(e.amount),
+              date: e.entry_date,
+              vendor: e.vendor,
+              category: (e.financial_categories as { name: string } | null)?.name ?? 'Outros',
+            })),
+          }
+        }
+
+        return { error: 'Tipo de consulta não reconhecido.' }
+      },
+    }),
   }
 }

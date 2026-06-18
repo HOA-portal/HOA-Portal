@@ -9,6 +9,7 @@ import type {
   WorkOrderStatus,
   ComplaintStatus,
   ViolationStatus,
+  FinancialEntryType,
 } from '@/types/database'
 
 async function requireAdmin() {
@@ -194,6 +195,180 @@ async function dispatchAnnouncementNotifications(
   }
 
   await Promise.allSettled(tasks)
+}
+
+// ── Finances ──────────────────────────────────────────────────────────────────
+
+export async function createFinancialPeriod(
+  year: number,
+  month: number,
+): Promise<{ data?: { id: string }; error?: string }> {
+  const { supabase, hoaId, userId } = await requireAdmin()
+
+  // Seed categories if this is the HOA's first period
+  const { count } = await supabase
+    .from('financial_categories')
+    .select('id', { count: 'exact', head: true })
+    .eq('hoa_id', hoaId)
+
+  if (count === 0) {
+    await supabase.rpc('seed_default_financial_categories', {
+      p_hoa_id: hoaId,
+      p_admin_id: userId,
+    })
+  }
+
+  const { data, error } = await supabase
+    .from('financial_periods')
+    .insert({ hoa_id: hoaId, year, month, created_by: userId })
+    .select('id')
+    .single()
+
+  if (error) {
+    if (error.code === '23505') return { error: 'Já existe um período para esse mês.' }
+    return { error: error.message }
+  }
+
+  revalidatePath('/admin/finances')
+  revalidatePath('/finances')
+  return { data: { id: data.id } }
+}
+
+export async function closePeriod(periodId: string): Promise<{ error?: string }> {
+  const { supabase, hoaId, userId } = await requireAdmin()
+
+  const { data: period } = await supabase
+    .from('financial_periods')
+    .select('id, status')
+    .eq('id', periodId)
+    .eq('hoa_id', hoaId)
+    .single()
+
+  if (!period) return { error: 'Período não encontrado.' }
+  if (period.status === 'closed') return { error: 'Este período já está fechado.' }
+
+  const { error } = await supabase
+    .from('financial_periods')
+    .update({ status: 'closed', closed_by: userId, closed_at: new Date().toISOString() })
+    .eq('id', periodId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/admin/finances')
+  revalidatePath('/admin')
+  revalidatePath('/finances')
+  return {}
+}
+
+export async function createFinancialEntry(
+  periodId: string,
+  data: {
+    category_id: string
+    type: FinancialEntryType
+    description: string
+    amount: number
+    entry_date: string
+    vendor?: string
+    receipt_url?: string
+  },
+): Promise<{ data?: { id: string }; error?: string }> {
+  const { supabase, hoaId, userId } = await requireAdmin()
+
+  const { data: period } = await supabase
+    .from('financial_periods')
+    .select('id, status')
+    .eq('id', periodId)
+    .eq('hoa_id', hoaId)
+    .single()
+
+  if (!period) return { error: 'Período não encontrado.' }
+  if (period.status === 'closed') return { error: 'Não é possível adicionar lançamentos a um período fechado.' }
+
+  const { data: entry, error } = await supabase
+    .from('financial_entries')
+    .insert({
+      hoa_id: hoaId,
+      period_id: periodId,
+      category_id: data.category_id,
+      type: data.type,
+      description: data.description.trim(),
+      amount: data.amount,
+      entry_date: data.entry_date,
+      vendor: data.vendor?.trim() || null,
+      receipt_url: data.receipt_url || null,
+      created_by: userId,
+    })
+    .select('id')
+    .single()
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/admin/finances')
+  revalidatePath('/finances')
+  return { data: { id: entry.id } }
+}
+
+export async function updateFinancialEntry(
+  entryId: string,
+  updates: Partial<{
+    category_id: string
+    description: string
+    amount: number
+    entry_date: string
+    vendor: string | null
+    receipt_url: string | null
+  }>,
+): Promise<{ error?: string }> {
+  const { supabase, hoaId } = await requireAdmin()
+
+  // Guard: verify entry belongs to HOA and period is open
+  const { data: entry } = await supabase
+    .from('financial_entries')
+    .select('id, financial_periods(status)')
+    .eq('id', entryId)
+    .eq('hoa_id', hoaId)
+    .single()
+
+  if (!entry) return { error: 'Lançamento não encontrado.' }
+  const period = (entry.financial_periods as unknown) as { status: string } | null
+  if (period?.status === 'closed') return { error: 'Não é possível alterar lançamentos de um período fechado.' }
+
+  const { error } = await supabase
+    .from('financial_entries')
+    .update(updates)
+    .eq('id', entryId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/admin/finances')
+  revalidatePath('/finances')
+  return {}
+}
+
+export async function deleteFinancialEntry(entryId: string): Promise<{ error?: string }> {
+  const { supabase, hoaId } = await requireAdmin()
+
+  const { data: entry } = await supabase
+    .from('financial_entries')
+    .select('id, financial_periods(status)')
+    .eq('id', entryId)
+    .eq('hoa_id', hoaId)
+    .single()
+
+  if (!entry) return { error: 'Lançamento não encontrado.' }
+  const period = (entry.financial_periods as unknown) as { status: string } | null
+  if (period?.status === 'closed') return { error: 'Não é possível excluir lançamentos de um período fechado.' }
+
+  const { error } = await supabase
+    .from('financial_entries')
+    .delete()
+    .eq('id', entryId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/admin/finances')
+  revalidatePath('/finances')
+  return {}
 }
 
 export async function deleteAnnouncement(

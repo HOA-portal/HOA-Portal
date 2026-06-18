@@ -19,6 +19,7 @@ import {
   BarChart2,
   Users,
   Settings,
+  DollarSign,
 } from 'lucide-react'
 
 const residentNav = [
@@ -27,6 +28,7 @@ const residentNav = [
   { href: '/bookings', label: 'Bookings', icon: CalendarDays },
   { href: '/complaints', label: 'Complaints', icon: ClipboardList },
   { href: '/announcements', label: 'Announcements', icon: Megaphone },
+  { href: '/finances', label: 'Finanças', icon: DollarSign },
 ]
 
 const adminNav = [
@@ -40,6 +42,7 @@ const adminNav = [
   { href: '/admin/analytics', label: 'RAG Analytics', icon: BarChart2 },
   { href: '/admin/residents', label: 'Residents', icon: Users },
   { href: '/admin/amenities', label: 'Amenities', icon: CalendarDays },
+  { href: '/admin/finances', label: 'Finanças', icon: DollarSign },
   { href: '/admin/settings', label: 'Settings', icon: Settings },
 ]
 

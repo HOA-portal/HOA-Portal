@@ -27,6 +27,9 @@ const colors: Record<string, string> = {
   active: 'bg-green-100 text-green-700',
   invited: 'bg-amber-100 text-amber-700',
   inactive: 'bg-slate-100 text-slate-500',
+  // Financial entry type
+  income: 'bg-emerald-100 text-emerald-700',
+  expense: 'bg-rose-100 text-rose-700',
 }
 
 export function StatusBadge({
