@@ -24,7 +24,7 @@ export function StatementUploadModal({ open, onClose, onParsed }: Props) {
     const selected = e.target.files?.[0]
     if (!selected) return
     if (!selected.name.toLowerCase().endsWith('.pdf')) {
-      toast.error('Apenas arquivos PDF são aceitos')
+      toast.error('Only PDF files are accepted')
       return
     }
     setFile(selected)
@@ -35,7 +35,7 @@ export function StatementUploadModal({ open, onClose, onParsed }: Props) {
     const dropped = e.dataTransfer.files[0]
     if (dropped) {
       if (!dropped.name.toLowerCase().endsWith('.pdf')) {
-        toast.error('Apenas arquivos PDF são aceitos')
+        toast.error('Only PDF files are accepted')
         return
       }
       setFile(dropped)
@@ -77,18 +77,18 @@ export function StatementUploadModal({ open, onClose, onParsed }: Props) {
         setUploadProgress(100)
         try {
           const body = JSON.parse(xhr.responseText)
-          toast.success('Extrato analisado com sucesso')
+          toast.success('Statement analyzed successfully')
           setFile(null)
           setUploadProgress(0)
           setPhase('idle')
           onClose()
           onParsed(body.id, body.parsed)
         } catch {
-          toast.error('Resposta inválida do servidor')
+          toast.error('Invalid server response')
           setPhase('idle')
         }
       } else {
-        let message = 'Erro ao processar extrato. Tente novamente.'
+        let message = 'Error processing statement. Please try again.'
         try {
           const body = JSON.parse(xhr.responseText)
           if (body.error) message = body.error
@@ -99,7 +99,7 @@ export function StatementUploadModal({ open, onClose, onParsed }: Props) {
     })
 
     xhr.addEventListener('error', () => {
-      toast.error('Erro de rede. Verifique sua conexão e tente novamente.')
+      toast.error('Network error. Check your connection and try again.')
       setPhase('idle')
     })
 
@@ -114,12 +114,12 @@ export function StatementUploadModal({ open, onClose, onParsed }: Props) {
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Importar Extrato Financeiro</DialogTitle>
+          <DialogTitle>Import Financial Statement</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 pt-2">
           <p className="text-sm text-muted-foreground">
-            Faça upload do PDF mensal gerado pela sua administradora. O sistema irá extrair automaticamente os lançamentos para revisão.
+            Upload the monthly PDF from your property management company. The system will automatically extract entries for review.
           </p>
 
           <div
@@ -162,9 +162,9 @@ export function StatementUploadModal({ open, onClose, onParsed }: Props) {
               <div>
                 <Upload className="h-8 w-8 text-slate-400 mx-auto mb-2" />
                 <p className="text-sm text-slate-600">
-                  Arraste ou <span className="text-primary font-medium">selecione</span> o PDF
+                  Drag or <span className="text-primary font-medium">select</span> the PDF
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">Apenas PDF, até 20 MB</p>
+                <p className="text-xs text-muted-foreground mt-1">PDF only, up to 20 MB</p>
               </div>
             )}
           </div>
@@ -172,7 +172,7 @@ export function StatementUploadModal({ open, onClose, onParsed }: Props) {
           {busy && (
             <div className="space-y-1">
               <div className="flex justify-between text-xs text-muted-foreground">
-                <span>{phase === 'uploading' ? 'Enviando…' : 'Analisando com IA…'}</span>
+                <span>{phase === 'uploading' ? 'Uploading…' : 'Analyzing with AI…'}</span>
                 <span>{uploadProgress}%</span>
               </div>
               <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
@@ -183,7 +183,7 @@ export function StatementUploadModal({ open, onClose, onParsed }: Props) {
               </div>
               {phase === 'parsing' && (
                 <p className="text-xs text-muted-foreground">
-                  Extraindo lançamentos automaticamente…
+                  Extracting entries automatically…
                 </p>
               )}
             </div>
@@ -191,10 +191,10 @@ export function StatementUploadModal({ open, onClose, onParsed }: Props) {
 
           <div className="flex gap-2 justify-end">
             <Button variant="outline" onClick={handleClose} disabled={busy}>
-              Cancelar
+              Cancel
             </Button>
             <Button onClick={handleUpload} disabled={!file || busy}>
-              {busy ? 'Processando…' : 'Analisar PDF'}
+              {busy ? 'Processing…' : 'Analyze PDF'}
             </Button>
           </div>
         </div>

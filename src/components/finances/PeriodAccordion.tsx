@@ -41,7 +41,7 @@ export function PeriodAccordion({ periods, isAdmin, onAddEntry, onClosePeriod, o
   if (periods.length === 0) {
     return (
       <div className="text-center py-10 text-slate-400 text-sm">
-        Nenhum período financeiro registrado ainda.
+        No financial periods registered yet.
       </div>
     )
   }
@@ -90,7 +90,7 @@ export function PeriodAccordion({ periods, isAdmin, onAddEntry, onClosePeriod, o
                     onClick={() => onAddEntry?.(period.id)}
                   >
                     <Plus className="h-3 w-3 mr-1" />
-                    Lançamento
+                    Add Entry
                   </Button>
                   <Button
                     variant="outline"
@@ -98,7 +98,7 @@ export function PeriodAccordion({ periods, isAdmin, onAddEntry, onClosePeriod, o
                     className="h-7 text-xs text-slate-500"
                     onClick={() => onClosePeriod?.(period.id)}
                   >
-                    Fechar período
+                    Close Period
                   </Button>
                 </div>
               )}
@@ -109,36 +109,36 @@ export function PeriodAccordion({ periods, isAdmin, onAddEntry, onClosePeriod, o
               <div className="px-4 pb-4 space-y-4 border-t border-slate-100 bg-slate-50/40">
                 {/* Mobile totals */}
                 <div className="sm:hidden flex gap-4 pt-3 text-xs">
-                  <span className="text-emerald-600">Receitas: {formatBRL(Number(period.total_income))}</span>
-                  <span className="text-rose-500">Despesas: {formatBRL(Number(period.total_expenses))}</span>
+                  <span className="text-emerald-600">Income: {formatBRL(Number(period.total_income))}</span>
+                  <span className="text-rose-500">Expenses: {formatBRL(Number(period.total_expenses))}</span>
                   <span className={`font-semibold ${balance >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
-                    Saldo: {formatBRL(balance)}
+                    Balance: {formatBRL(balance)}
                   </span>
                 </div>
 
                 {period.entries.length === 0 ? (
-                  <p className="text-sm text-slate-400 pt-3">Nenhum lançamento neste período.</p>
+                  <p className="text-sm text-slate-400 pt-3">No entries in this period.</p>
                 ) : (
                   <>
                     {/* Category breakdown bars */}
                     <div className="pt-3">
-                      <p className="text-xs font-medium text-slate-500 mb-2">Despesas por categoria</p>
+                      <p className="text-xs font-medium text-slate-500 mb-2">Expenses by Category</p>
                       <CategoryBars entries={categoryEntries} showType="expense" />
                     </div>
 
                     {/* Entries table */}
                     <div className="pt-1">
-                      <p className="text-xs font-medium text-slate-500 mb-2">Lançamentos</p>
+                      <p className="text-xs font-medium text-slate-500 mb-2">Entries</p>
                       <div className="overflow-x-auto rounded border border-slate-200">
                         <table className="w-full text-xs">
                           <thead className="bg-slate-100 text-slate-500">
                             <tr>
-                              <th className="text-left px-3 py-2 font-medium">Data</th>
-                              <th className="text-left px-3 py-2 font-medium">Categoria</th>
-                              <th className="text-left px-3 py-2 font-medium hidden sm:table-cell">Descrição</th>
-                              <th className="text-left px-3 py-2 font-medium hidden md:table-cell">Fornecedor</th>
-                              <th className="text-left px-3 py-2 font-medium">Tipo</th>
-                              <th className="text-right px-3 py-2 font-medium">Valor</th>
+                              <th className="text-left px-3 py-2 font-medium">Date</th>
+                              <th className="text-left px-3 py-2 font-medium">Category</th>
+                              <th className="text-left px-3 py-2 font-medium hidden sm:table-cell">Description</th>
+                              <th className="text-left px-3 py-2 font-medium hidden md:table-cell">Vendor</th>
+                              <th className="text-left px-3 py-2 font-medium">Type</th>
+                              <th className="text-right px-3 py-2 font-medium">Amount</th>
                               {isAdmin && period.status === 'open' && (
                                 <th className="px-3 py-2" />
                               )}
@@ -148,7 +148,7 @@ export function PeriodAccordion({ periods, isAdmin, onAddEntry, onClosePeriod, o
                             {period.entries.map((entry) => (
                               <tr key={entry.id} className="hover:bg-slate-50">
                                 <td className="px-3 py-2 text-slate-600">
-                                  {new Date(entry.entry_date + 'T12:00:00').toLocaleDateString('pt-BR')}
+                                  {new Date(entry.entry_date + 'T12:00:00').toLocaleDateString('en-US')}
                                 </td>
                                 <td className="px-3 py-2 text-slate-700">
                                   {entry.financial_categories?.name ?? '—'}
@@ -171,7 +171,7 @@ export function PeriodAccordion({ periods, isAdmin, onAddEntry, onClosePeriod, o
                                       onClick={() => onDeleteEntry?.(entry.id)}
                                       className="text-slate-400 hover:text-red-500 transition-colors text-xs"
                                     >
-                                      excluir
+                                      delete
                                     </button>
                                   </td>
                                 )}

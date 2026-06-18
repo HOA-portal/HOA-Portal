@@ -67,7 +67,7 @@ export function EntryFormModal({ open, onClose, periodId, categories }: Props) {
     if (!categoryId || !description.trim() || !amount || !entryDate) return
     const parsedAmount = parseFloat(amount.replace(',', '.'))
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      setError('Informe um valor válido maior que zero.')
+      setError('Enter a valid amount greater than zero.')
       return
     }
 
@@ -87,7 +87,7 @@ export function EntryFormModal({ open, onClose, periodId, categories }: Props) {
       setError(result.error)
       setSaving(false)
     } else {
-      toast.success('Lançamento adicionado')
+      toast.success('Entry added')
       router.refresh()
       reset()
       onClose()
@@ -101,24 +101,24 @@ export function EntryFormModal({ open, onClose, periodId, categories }: Props) {
     <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-base">Novo Lançamento</DialogTitle>
+          <DialogTitle className="text-base">New Entry</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 text-sm">
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-slate-600">
-              Categoria <span className="text-red-500">*</span>
+              Category <span className="text-red-500">*</span>
             </label>
             <Select value={categoryId} onValueChange={handleCategoryChange}>
               <SelectTrigger className="h-8 text-sm">
-                <SelectValue placeholder="Selecione uma categoria" />
+                <SelectValue placeholder="Select a category" />
               </SelectTrigger>
               <SelectContent>
-                <div className="px-2 py-1 text-xs font-medium text-slate-400">Receitas</div>
+                <div className="px-2 py-1 text-xs font-medium text-slate-400">Income</div>
                 {activeCategories.filter((c) => c.type === 'income').map((c) => (
                   <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                 ))}
-                <div className="px-2 py-1 text-xs font-medium text-slate-400 mt-1">Despesas</div>
+                <div className="px-2 py-1 text-xs font-medium text-slate-400 mt-1">Expenses</div>
                 {activeCategories.filter((c) => c.type === 'expense').map((c) => (
                   <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                 ))}
@@ -129,19 +129,19 @@ export function EntryFormModal({ open, onClose, periodId, categories }: Props) {
           {selectedCategory && (
             <div className="text-xs text-slate-500 -mt-2">
               Tipo: <span className={selectedCategory.type === 'income' ? 'text-emerald-600 font-medium' : 'text-rose-600 font-medium'}>
-                {selectedCategory.type === 'income' ? 'Receita' : 'Despesa'}
+                {selectedCategory.type === 'income' ? 'Income' : 'Expense'}
               </span>
             </div>
           )}
 
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-slate-600">
-              Descrição <span className="text-red-500">*</span>
+              Description <span className="text-red-500">*</span>
             </label>
             <Input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Ex: Manutenção da piscina"
+              placeholder="e.g. Pool Maintenance"
               className="h-8 text-sm"
             />
           </div>
@@ -149,7 +149,7 @@ export function EntryFormModal({ open, onClose, periodId, categories }: Props) {
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-slate-600">
-                Valor (R$) <span className="text-red-500">*</span>
+                Amount ($) <span className="text-red-500">*</span>
               </label>
               <Input
                 type="number"
@@ -157,14 +157,14 @@ export function EntryFormModal({ open, onClose, periodId, categories }: Props) {
                 step="0.01"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                placeholder="0,00"
+                placeholder="0.00"
                 className="h-8 text-sm"
               />
             </div>
 
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-slate-600">
-                Data <span className="text-red-500">*</span>
+                Date <span className="text-red-500">*</span>
               </label>
               <Input
                 type="date"
@@ -176,11 +176,11 @@ export function EntryFormModal({ open, onClose, periodId, categories }: Props) {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-slate-600">Fornecedor (opcional)</label>
+            <label className="text-xs font-medium text-slate-600">Vendor (optional)</label>
             <Input
               value={vendor}
               onChange={(e) => setVendor(e.target.value)}
-              placeholder="Ex: Empresa de Limpeza LTDA"
+              placeholder="e.g. Cleaning Services LLC"
               className="h-8 text-sm"
             />
           </div>
@@ -189,10 +189,10 @@ export function EntryFormModal({ open, onClose, periodId, categories }: Props) {
 
           <div className="flex justify-end gap-2 pt-1">
             <Button variant="outline" size="sm" onClick={handleClose} disabled={saving}>
-              Cancelar
+              Cancel
             </Button>
             <Button size="sm" onClick={handleSave} disabled={saving || !isValid}>
-              {saving ? 'Salvando…' : 'Salvar'}
+              {saving ? 'Saving…' : 'Save'}
             </Button>
           </div>
         </div>

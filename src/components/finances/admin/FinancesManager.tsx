@@ -48,31 +48,31 @@ export function FinancesManager({ periods, categories }: Props) {
     if (result.error) {
       toast.error(result.error)
     } else {
-      toast.success('Período criado')
+      toast.success('Period created')
       router.refresh()
     }
   }
 
   async function handleClosePeriod(periodId: string) {
-    const confirmed = window.confirm('Fechar este período? Lançamentos não poderão mais ser editados.')
+    const confirmed = window.confirm('Close this period? Entries can no longer be edited.')
     if (!confirmed) return
     const result = await closePeriod(periodId)
     if (result.error) {
       toast.error(result.error)
     } else {
-      toast.success('Período fechado')
+      toast.success('Period closed')
       router.refresh()
     }
   }
 
   async function handleDeleteEntry(entryId: string) {
-    const confirmed = window.confirm('Excluir este lançamento?')
+    const confirmed = window.confirm('Delete this entry?')
     if (!confirmed) return
     const result = await deleteFinancialEntry(entryId)
     if (result.error) {
       toast.error(result.error)
     } else {
-      toast.success('Lançamento excluído')
+      toast.success('Entry deleted')
       router.refresh()
     }
   }
@@ -85,22 +85,22 @@ export function FinancesManager({ periods, categories }: Props) {
           balance={balance}
           totalIncome={totalIncome}
           totalExpenses={totalExpenses}
-          label="Saldo Acumulado"
+          label="Accumulated Balance"
         />
       </div>
 
       {/* Header row */}
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium text-slate-700">Períodos mensais</h2>
+        <h2 className="text-sm font-medium text-slate-700">Monthly Periods</h2>
         <div className="flex items-center gap-2">
           <Button size="sm" variant="outline" onClick={() => setUploadOpen(true)}>
             <Upload className="h-4 w-4 mr-1" />
-            Importar Extrato PDF
+            Import PDF Statement
           </Button>
           {!hasCurrentMonth && (
             <Button size="sm" onClick={handleCreatePeriod} disabled={loading}>
               <Plus className="h-4 w-4 mr-1" />
-              Novo período
+              New Period
             </Button>
           )}
         </div>

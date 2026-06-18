@@ -61,8 +61,8 @@ export default async function AdminFinancesPage() {
     <div className="flex-1 overflow-auto">
       <div className="px-8 py-6">
         <AdminPageHeader
-          title="Finanças"
-          description="Gerencie receitas e despesas mensais do condomínio. Moradores têm acesso de leitura para auditoria."
+          title="Finances"
+          description="Manage monthly income and expenses for the HOA. Residents have read-only access for auditing."
         />
         <div className="mt-6">
           <FinancesManager

@@ -88,7 +88,7 @@ export function StatementReviewModal({ open, onClose, statementId, parsed, categ
 
   async function handleImport() {
     if (missingCategory) {
-      toast.error('Selecione uma categoria para todos os lançamentos incluídos.')
+      toast.error('Select a category for all included entries.')
       return
     }
     setImporting(true)
@@ -110,24 +110,24 @@ export function StatementReviewModal({ open, onClose, statementId, parsed, categ
     setImporting(false)
 
     if (res.ok) {
-      toast.success(`${entries.length} lançamentos importados com sucesso`)
+      toast.success(`${entries.length} entries imported successfully`)
       router.refresh()
       onClose()
     } else {
       const body = await res.json().catch(() => ({}))
-      toast.error(body.error ?? 'Erro ao importar. Tente novamente.')
+      toast.error(body.error ?? 'Failed to import. Please try again.')
     }
   }
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && !importing && onClose()}>
-      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
         <DialogHeader className="shrink-0">
           <DialogTitle className="text-base">
-            Revisar Extrato — {parsed.period_label}
+            Review Statement — {parsed.period_label}
           </DialogTitle>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Confirme os lançamentos extraídos e mapeie para as categorias do condomínio.
+            Confirm extracted entries and map them to HOA categories.
           </p>
         </DialogHeader>
 
@@ -136,9 +136,9 @@ export function StatementReviewModal({ open, onClose, statementId, parsed, categ
             {/* Income section */}
             <section>
               <div className="flex items-center gap-2 mb-2">
-                <h3 className="text-sm font-semibold text-slate-700">Receitas</h3>
+                <h3 className="text-sm font-semibold text-slate-700">Income</h3>
                 <Badge variant="outline" className="text-emerald-600 border-emerald-200 bg-emerald-50 text-xs">
-                  {formatAmount(parsed.total_income)} total no PDF
+                  {formatAmount(parsed.total_income)} total in PDF
                 </Badge>
               </div>
               <EntryTable
@@ -151,9 +151,9 @@ export function StatementReviewModal({ open, onClose, statementId, parsed, categ
             {/* Expense section */}
             <section>
               <div className="flex items-center gap-2 mb-2">
-                <h3 className="text-sm font-semibold text-slate-700">Despesas</h3>
+                <h3 className="text-sm font-semibold text-slate-700">Expenses</h3>
                 <Badge variant="outline" className="text-rose-600 border-rose-200 bg-rose-50 text-xs">
-                  {formatAmount(parsed.total_expenses)} total no PDF
+                  {formatAmount(parsed.total_expenses)} total in PDF
                 </Badge>
               </div>
               <EntryTable
@@ -171,27 +171,27 @@ export function StatementReviewModal({ open, onClose, statementId, parsed, categ
             <div className="flex items-start gap-2 text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 text-xs">
               <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
               <span>
-                Os totais selecionados diferem do PDF original.
-                {incomeDiff && ` Receitas: ${formatAmount(importedIncome)} vs ${formatAmount(parsed.total_income)}.`}
-                {expenseDiff && ` Despesas: ${formatAmount(importedExpenses)} vs ${formatAmount(parsed.total_expenses)}.`}
+                Selected totals differ from the original PDF.
+                {incomeDiff && ` Income: ${formatAmount(importedIncome)} vs ${formatAmount(parsed.total_income)}.`}
+                {expenseDiff && ` Expenses: ${formatAmount(importedExpenses)} vs ${formatAmount(parsed.total_expenses)}.`}
               </span>
             </div>
           )}
 
           <div className="flex items-center justify-between">
             <div className="text-xs text-muted-foreground">
-              <span className="font-medium text-slate-700">{includedRows.length}</span> de {rows.length} lançamentos selecionados
+              <span className="font-medium text-slate-700">{includedRows.length}</span> of {rows.length} entries selected
             </div>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={onClose} disabled={importing}>
-                Cancelar
+                Cancel
               </Button>
               <Button
                 size="sm"
                 onClick={handleImport}
                 disabled={importing || includedRows.length === 0 || missingCategory}
               >
-                {importing ? 'Importando…' : `Importar ${includedRows.length} lançamentos`}
+                {importing ? 'Importing…' : `Import ${includedRows.length} entries`}
               </Button>
             </div>
           </div>
@@ -209,7 +209,7 @@ interface EntryTableProps {
 
 function EntryTable({ rows, categories, onUpdate }: EntryTableProps) {
   if (rows.length === 0) {
-    return <p className="text-xs text-muted-foreground py-2">Nenhum item encontrado.</p>
+    return <p className="text-xs text-muted-foreground py-2">No items found.</p>
   }
 
   return (
@@ -218,9 +218,9 @@ function EntryTable({ rows, categories, onUpdate }: EntryTableProps) {
         <thead>
           <tr className="bg-slate-50 border-b">
             <th className="w-8 py-2 px-2 text-center font-medium text-slate-500"></th>
-            <th className="py-2 px-3 text-left font-medium text-slate-500">Descrição</th>
-            <th className="py-2 px-3 text-left font-medium text-slate-500 w-40">Categoria</th>
-            <th className="py-2 px-3 text-right font-medium text-slate-500 w-28">Valor</th>
+            <th className="py-2 px-3 text-left font-medium text-slate-500">Description</th>
+            <th className="py-2 px-3 text-left font-medium text-slate-500 w-40">Category</th>
+            <th className="py-2 px-3 text-right font-medium text-slate-500 w-28">Amount</th>
           </tr>
         </thead>
         <tbody>
@@ -240,7 +240,7 @@ function EntryTable({ rows, categories, onUpdate }: EntryTableProps) {
                   disabled={!row.included}
                 >
                   <SelectTrigger className="h-7 text-xs">
-                    <SelectValue placeholder="Selecionar…" />
+                    <SelectValue placeholder="Select…" />
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map((c) => (
