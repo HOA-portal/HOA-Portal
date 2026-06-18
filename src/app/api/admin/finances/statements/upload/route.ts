@@ -57,10 +57,18 @@ export async function POST(request: Request): Promise<Response> {
   // Auto-create it with the service role and retry once.
   if (storageError && /bucket not found/i.test(storageError.message)) {
     const serviceClient = await createServiceClient()
-    await serviceClient.storage.createBucket('financial-statements', {
+    const { error: bucketErr } = await serviceClient.storage.createBucket('financial-statements', {
       public: false,
       allowedMimeTypes: ['application/pdf'],
     })
+
+    // "already exists" is fine (migration was applied, or race condition)
+    if (bucketErr && !/already exists/i.test(bucketErr.message)) {
+      return Response.json({
+        error: `Não foi possível criar o bucket de armazenamento: ${bucketErr.message}. Execute "supabase migration up" ou crie o bucket manualmente no Dashboard do Supabase.`,
+      }, { status: 500 })
+    }
+
     const retry = await supabase.storage.from('financial-statements').upload(storagePath, file)
     storageError = retry.error ?? null
   }
