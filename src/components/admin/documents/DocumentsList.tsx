@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { FileText, Loader2, CheckCircle2, XCircle, Clock, Plus, Trash2, RefreshCw, Layers, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Progress } from '@/components/ui/progress'
 import { UploadDocumentModal } from './UploadDocumentModal'
 import { DocumentChunksDrawer } from './DocumentChunksDrawer'
 import type { CcrDocument } from '@/app/(app)/admin/documents/page'
@@ -137,6 +138,9 @@ export function DocumentsList({ documents }: { documents: CcrDocument[] }) {
                         <p className="font-medium text-slate-900 text-sm truncate max-w-xs">
                           {doc.filename}
                         </p>
+                        {doc.version > 1 && (
+                          <span className="text-xs text-muted-foreground font-mono">v{doc.version}</span>
+                        )}
                         <span
                           className={cn(
                             'inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border',
@@ -147,6 +151,10 @@ export function DocumentsList({ documents }: { documents: CcrDocument[] }) {
                           {badgeLabel}
                         </span>
                       </div>
+
+                      {doc.status === 'processing' && (
+                        <Progress value={doc.progress_pct ?? 0} className="h-1 mt-1 mb-1" />
+                      )}
 
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
                         {doc.status === 'completed' && !isEmptyCompleted && (

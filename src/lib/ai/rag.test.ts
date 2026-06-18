@@ -70,6 +70,7 @@ describe('buildPassage', () => {
       section_title: 'Section 1',
       metadata: {},
       similarity: 0.8,
+      confidence: 'high',
     }
     expect(buildPassage(chunk)).toBe('Main text.')
   })
@@ -83,6 +84,7 @@ describe('buildPassage', () => {
       section_title: 'Section 2',
       metadata: {},
       similarity: 0.75,
+      confidence: 'medium',
     }
     expect(buildPassage(chunk)).toBe('Before text.\n\nMiddle text.\n\nAfter text.')
   })
@@ -96,6 +98,7 @@ describe('buildPassage', () => {
       section_title: 'Section 3',
       metadata: {},
       similarity: 0.6,
+      confidence: 'low',
     }
     expect(buildPassage(chunk)).toBe('Previous chunk.\n\nLast chunk.')
   })
@@ -149,7 +152,7 @@ describe('searchCCRs', () => {
     expect(mock.rpc).toHaveBeenCalledWith('match_ccr_chunks_with_context', expect.objectContaining({
       p_hoa_id: 'hoa-1',
       match_count: 10,       // matchCount(5) * 2 — extra candidates for reranker
-      match_threshold: 0.3,
+      match_threshold: 0.15,
     }))
   })
 
@@ -300,5 +303,25 @@ describe('searchCCRs', () => {
     // Falls back to original RRF order
     expect(result[0].id).toBe('chunk-1')
     expect(result[1].id).toBe('chunk-2')
+  })
+
+  it('annotates chunks with confidence based on RRF similarity', async () => {
+    // 3 chunks with similarity spanning all 3 tiers (CONFIDENCE_HIGH=0.030, CONFIDENCE_MEDIUM=0.020)
+    const chunksForConfidence = [
+      { id: 'high', content: 'High.', prev_content: null, next_content: null, section_title: 'A', metadata: {}, similarity: 0.032 },
+      { id: 'medium', content: 'Medium.', prev_content: null, next_content: null, section_title: 'B', metadata: {}, similarity: 0.025 },
+      { id: 'low', content: 'Low.', prev_content: null, next_content: null, section_title: 'C', metadata: {}, similarity: 0.015 },
+    ]
+    // matchCount=3 → topN=3; mock returns 3 chunks → chunks.length(3) <= topN(3) → reranker skipped
+    // HyDE also fails (beforeEach rejects generateText) → falls back to original query
+    mockEmbeddingsCreate.mockResolvedValue({ data: [{ embedding: Array(1536).fill(0.5) }] })
+    const mock = buildSupabaseMock({ dbResult: { data: chunksForConfidence, error: null } })
+    mockCreateClient.mockResolvedValue(mock as ReturnType<typeof buildSupabaseMock>)
+
+    const result = await searchCCRs('test query', 'hoa-1', 3)
+
+    expect(result[0].confidence).toBe('high')
+    expect(result[1].confidence).toBe('medium')
+    expect(result[2].confidence).toBe('low')
   })
 })

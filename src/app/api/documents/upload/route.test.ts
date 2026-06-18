@@ -157,14 +157,14 @@ describe('POST /api/documents/upload', () => {
     expect(body.status).toBe('pending')
   })
 
-  it('returns 202 with duplicateWarning when filename already exists', async () => {
+  it('returns 202 with version=2 and previousVersion when filename already exists', async () => {
     mockCreateClient.mockResolvedValue(
-      buildMock({ existingDoc: { id: 'old-doc-99', status: 'completed' } })
+      buildMock({ existingDoc: { id: 'old-doc-99', status: 'completed', version: 1 } })
     )
     const res = await POST(makeRequest(makePdfFile()))
     expect(res.status).toBe(202)
     const body = await res.json()
-    expect(body.duplicateWarning).toBe(true)
-    expect(body.existingDocumentId).toBe('old-doc-99')
+    expect(body.version).toBe(2)
+    expect(body.previousVersion).toBe('old-doc-99')
   })
 })

@@ -156,6 +156,19 @@ async function processMessage(
   // document is broken. Fail it permanently and remove from queue.
   if (msg.read_ct >= POISON_PILL_LIMIT) {
     console.error(`[process-document] Poison pill: doc ${document_id} read ${msg.read_ct} times — failing permanently`)
+    try {
+      await supabase.rpc('dlq_insert', {
+        p_hoa_id: hoa_id,
+        p_document_id: document_id,
+        p_msg_id: msg.msg_id,
+        p_read_ct: msg.read_ct,
+        p_enqueued_at: msg.enqueued_at,
+        p_last_error: `Poison pill after ${msg.read_ct} attempts`,
+        p_raw_message: msg.message,
+      })
+    } catch (dlqErr) {
+      console.error('[process-document] DLQ insert failed:', dlqErr)
+    }
     await supabase.from('ccr_documents').update({
       status: 'failed',
       error_message: `Processing failed after ${msg.read_ct} attempts — contact support`,
@@ -184,9 +197,11 @@ async function processMessage(
     }
 
     const pdfBuffer = await fileData.arrayBuffer()
+    void setProgress(supabase, document_id, 10)
 
     // Extract text / OCR
     const { pages, isOcr, ocrPageCount } = await extractPages(pdfBuffer)
+    void setProgress(supabase, document_id, 25)
 
     // Parse hierarchy and chunk
     const sections = parseHierarchy(pages)
@@ -195,6 +210,7 @@ async function processMessage(
       allChunks.push(...chunkSection(section, isOcr, storage_path))
     }
     allChunks.forEach((c, i) => { c.chunk_index = i })
+    void setProgress(supabase, document_id, 50)
 
     // Guard: fail loudly if no chunks were produced (e.g. corrupt PDF or unexpected OCR failure)
     if (allChunks.length === 0) {
@@ -223,6 +239,7 @@ async function processMessage(
 
     // Embed all chunks in a single batched API call (OpenAI supports up to 2048 inputs)
     const embeddings = await embedBatch(openai, allChunks.map(c => c.embed_content))
+    void setProgress(supabase, document_id, 75)
 
     // Precompute content hashes for deduplication (same PDF re-uploaded → ON CONFLICT DO NOTHING)
     const contentHashes = await Promise.all(allChunks.map(c => sha256Hex(c.content)))
@@ -256,6 +273,7 @@ async function processMessage(
         chunk_count: allChunks.length,
         processed_at: new Date().toISOString(),
         error_message: null,
+        progress_pct: 100,
       })
       .eq('id', document_id)
 
@@ -609,6 +627,16 @@ async function withRetry<T>(
 // Embedding — batched for efficiency
 // OpenAI supports up to 2048 inputs per call; embeddings are returned in input order.
 // ============================================================
+
+async function setProgress(
+  supabase: ReturnType<typeof createClient>,
+  documentId: string,
+  pct: number
+): Promise<void> {
+  try {
+    await supabase.from('ccr_documents').update({ progress_pct: pct }).eq('id', documentId)
+  } catch { /* fire-and-forget — never block processing */ }
+}
 
 async function sha256Hex(text: string): Promise<string> {
   const encoded = new TextEncoder().encode(text)

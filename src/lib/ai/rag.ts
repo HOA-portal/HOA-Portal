@@ -4,6 +4,10 @@ import { generateText } from 'ai'
 import { anthropic } from '@ai-sdk/anthropic'
 import { withRetry } from '@/lib/utils/retry'
 
+// RRF score thresholds — calibrate with /api/admin/rag/calibration after first week in production
+const CONFIDENCE_HIGH = 0.030
+const CONFIDENCE_MEDIUM = 0.020
+
 function getOpenAI() {
   return new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 }
@@ -25,6 +29,7 @@ export interface RagChunk {
   section_title: string | null
   metadata: Record<string, unknown>
   similarity: number
+  confidence: 'high' | 'medium' | 'low'
 }
 
 /** Assemble full passage: prev + main + next chunk, separated by blank lines. */
@@ -63,11 +68,13 @@ async function hydeExpand(query: string): Promise<string> {
  * that have good vector similarity but don't answer the question.
  * Always falls back to the original order on any error.
  */
+type PreAnnotated = Omit<RagChunk, 'confidence'>
+
 async function rerankChunks(
   query: string,
-  chunks: RagChunk[],
+  chunks: PreAnnotated[],
   topN: number
-): Promise<RagChunk[]> {
+): Promise<PreAnnotated[]> {
   if (chunks.length <= topN) return chunks
 
   const numbered = chunks.map((c, i) =>
@@ -134,7 +141,7 @@ export async function searchCCRs(
     metadata: unknown
     similarity: number
   }>
-  const results: RagChunk[] = rows.map(row => ({
+  const results = rows.map(row => ({
     id: row.id,
     content: row.content,
     prev_content: row.prev_content ?? null,
@@ -147,12 +154,20 @@ export async function searchCCRs(
   // Rerank: Claude Haiku picks the most relevant chunks from the candidate set.
   const reranked = await rerankChunks(query, results, matchCount)
 
+  // Annotate each chunk with a confidence tier based on its RRF score.
+  const annotated = reranked.map(chunk => ({
+    ...chunk,
+    confidence: chunk.similarity >= CONFIDENCE_HIGH ? 'high' as const
+      : chunk.similarity >= CONFIDENCE_MEDIUM ? 'medium' as const
+      : 'low' as const,
+  }))
+
   // Fire-and-forget analytics — never blocks the search response
   void (async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      const avgSimilarity = reranked.length > 0
-        ? reranked.reduce((sum, c) => sum + c.similarity, 0) / reranked.length
+      const avgSimilarity = annotated.length > 0
+        ? annotated.reduce((sum, c) => sum + c.similarity, 0) / annotated.length
         : null
 
       // Capture returned id so chunk hits can reference this query log
@@ -160,16 +175,16 @@ export async function searchCCRs(
         hoa_id: hoaId,
         user_id: user?.id ?? null,
         query_text: query,
-        match_count: reranked.length,
-        top_section_title: reranked[0]?.section_title ?? null,
+        match_count: annotated.length,
+        top_section_title: annotated[0]?.section_title ?? null,
         avg_similarity: avgSimilarity !== null ? Number(avgSimilarity.toFixed(3)) : null,
-        had_results: reranked.length > 0,
+        had_results: annotated.length > 0,
       }).select('id').single()
 
       // Log per-chunk hits for frequency/quality analysis
-      if (reranked.length > 0) {
+      if (annotated.length > 0) {
         await supabase.from('rag_chunk_hits').insert(
-          reranked.map((chunk, position) => ({
+          annotated.map((chunk, position) => ({
             hoa_id: hoaId,
             chunk_id: chunk.id,
             query_log_id: logRow?.id ?? null,
@@ -183,5 +198,5 @@ export async function searchCCRs(
     }
   })()
 
-  return reranked
+  return annotated
 }

@@ -44,6 +44,7 @@ export function buildResidentTools(profile: Profile) {
           results: chunks.map((c) => ({
             section: c.section_title ?? 'General Rules',
             content: buildPassage(c),
+            confidence: c.confidence,
           })),
         }
       },

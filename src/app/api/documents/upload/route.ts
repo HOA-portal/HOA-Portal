@@ -76,15 +76,17 @@ export async function POST(request: Request): Promise<Response> {
     )
   }
 
-  // Duplicate detection: warn if a document with the same filename already exists
+  // Fetch latest version for this filename — re-uploading creates version N+1 instead of overwriting
   const { data: existing } = await supabase
     .from('ccr_documents')
-    .select('id, status')
+    .select('id, status, version')
     .eq('hoa_id', hoaId)
     .eq('filename', file.name)
-    .order('created_at', { ascending: false })
+    .order('version', { ascending: false })
     .limit(1)
     .maybeSingle()
+
+  let nextVersion = existing ? (existing.version ?? 1) + 1 : 1
 
   const storagePath = `${hoaId}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
 
@@ -100,18 +102,43 @@ export async function POST(request: Request): Promise<Response> {
     )
   }
 
-  // Insert document record (status defaults to 'pending' via DB default)
-  const { data: doc, error: insertError } = await supabase
-    .from('ccr_documents')
-    .insert({
-      hoa_id: hoaId,
-      filename: file.name,
-      storage_path: storagePath,
-      uploaded_by: user.id,
-      last_queued_at: new Date().toISOString(),
-    })
-    .select('id')
-    .single()
+  // Insert document record. On unique_violation (23505 — concurrent upload race), re-fetch
+  // MAX(version) and retry once before giving up.
+  type InsertErr = { code?: string; message?: string } | null
+  let doc: { id: string } | null = null
+  let insertError: InsertErr = null
+
+  for (let attempt = 0; attempt <= 1; attempt++) {
+    if (attempt > 0) {
+      const { data: latest } = await supabase
+        .from('ccr_documents')
+        .select('version')
+        .eq('hoa_id', hoaId)
+        .eq('filename', file.name)
+        .order('version', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      nextVersion = (latest?.version ?? 0) + 1
+    }
+
+    const result = await supabase
+      .from('ccr_documents')
+      .insert({
+        hoa_id: hoaId,
+        filename: file.name,
+        storage_path: storagePath,
+        uploaded_by: user.id,
+        last_queued_at: new Date().toISOString(),
+        version: nextVersion,
+      })
+      .select('id')
+      .single()
+
+    doc = result.data
+    insertError = result.error as InsertErr
+    if (insertError?.code === '23505') continue
+    break
+  }
 
   if (insertError || !doc) {
     // Best-effort cleanup of the storage object
@@ -160,6 +187,7 @@ export async function POST(request: Request): Promise<Response> {
   return Response.json({
     documentId: doc.id,
     status: 'pending',
-    ...(existing ? { duplicateWarning: true, existingDocumentId: existing.id } : {}),
+    version: nextVersion,
+    ...(existing ? { previousVersion: existing.id } : {}),
   }, { status: 202 })
 }

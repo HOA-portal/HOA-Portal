@@ -195,6 +195,8 @@ export interface Database {
           last_queued_at: string | null
           embedding_tokens: number
           ocr_tokens: number
+          progress_pct: number
+          version: number
         }
         Insert: {
           id?: string
@@ -211,6 +213,8 @@ export interface Database {
           last_queued_at?: string | null
           embedding_tokens?: number
           ocr_tokens?: number
+          progress_pct?: number
+          version?: number
         }
         Update: {
           id?: string
@@ -227,6 +231,8 @@ export interface Database {
           last_queued_at?: string | null
           embedding_tokens?: number
           ocr_tokens?: number
+          progress_pct?: number
+          version?: number
         }
       }
       ccr_chunks: {
@@ -294,6 +300,44 @@ export interface Database {
           rank_position?: number
           similarity?: number | null
           created_at?: string
+        }
+      }
+      ccr_dlq: {
+        Row: {
+          id: number
+          hoa_id: string
+          document_id: string
+          msg_id: number
+          read_ct: number
+          enqueued_at: string
+          failed_at: string
+          last_error: string | null
+          raw_message: Record<string, unknown>
+          retried_at: string | null
+        }
+        Insert: {
+          id?: number
+          hoa_id: string
+          document_id: string
+          msg_id: number
+          read_ct: number
+          enqueued_at: string
+          failed_at?: string
+          last_error?: string | null
+          raw_message: Record<string, unknown>
+          retried_at?: string | null
+        }
+        Update: {
+          id?: number
+          hoa_id?: string
+          document_id?: string
+          msg_id?: number
+          read_ct?: number
+          enqueued_at?: string
+          failed_at?: string
+          last_error?: string | null
+          raw_message?: Record<string, unknown>
+          retried_at?: string | null
         }
       }
       work_orders: {

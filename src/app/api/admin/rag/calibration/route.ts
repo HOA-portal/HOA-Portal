@@ -48,11 +48,14 @@ export async function GET(): Promise<Response> {
     .filter((v): v is number => v !== null)
     .sort((a, b) => a - b)
 
-  const percentiles = {
+  const p25 = Number(percentile(similarities, 25).toFixed(4))
+  const p75 = Number(percentile(similarities, 75).toFixed(4))
+
+  const rrfScorePercentiles = {
     p10: Number(percentile(similarities, 10).toFixed(4)),
-    p25: Number(percentile(similarities, 25).toFixed(4)),
+    p25,
     p50: Number(percentile(similarities, 50).toFixed(4)),
-    p75: Number(percentile(similarities, 75).toFixed(4)),
+    p75,
     p90: Number(percentile(similarities, 90).toFixed(4)),
   }
 
@@ -60,10 +63,14 @@ export async function GET(): Promise<Response> {
     total,
     noResultRate: total > 0 ? Number((noResultCount / total).toFixed(4)) : 0,
     withSimilarityData: similarities.length,
-    percentiles,
-    // p25 blocks only the bottom 25% — a conservative starting point
-    suggestedThreshold: percentiles.p25,
-    currentThreshold: 0.15,
-    note: 'Update matchThreshold in src/lib/ai/rag.ts after reviewing with real data.',
+    // Post-RRF score distribution (range ~0.010–0.033, NOT cosine similarity)
+    rrfScorePercentiles,
+    // Suggested thresholds for the confidence annotation in rag.ts (CONFIDENCE_HIGH/MEDIUM)
+    suggestedConfidenceThresholds: { high: p75, medium: p25 },
+    // Pre-RRF pgvector cosine similarity threshold — different scale from rrfScorePercentiles
+    preRrfMatchThreshold: {
+      current: 0.15,
+      note: 'pgvector cosine similarity (pre-RRF). Do NOT set it to the RRF percentile values above — different scale.',
+    },
   })
 }

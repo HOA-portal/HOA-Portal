@@ -148,11 +148,13 @@ async function processDocument(
   }
 
   const pdfBuffer = await (fileBlob as Blob).arrayBuffer()
+  void setProgress(serviceClient, docId, 10)
 
   // Extract pages (with OCR fallback)
   let ocrTokens = 0
   const { pages, isOcr, ocrTokens: extractedOcrTokens } = await extractPages(pdfBuffer)
   ocrTokens += extractedOcrTokens
+  void setProgress(serviceClient, docId, 25)
 
   // Parse CC&R hierarchy
   const sections = parseHierarchy(pages)
@@ -161,6 +163,7 @@ async function processDocument(
     allChunks.push(...chunkSection(section, isOcr, storagePath))
   }
   allChunks.forEach((c, i) => { c.chunk_index = i })
+  void setProgress(serviceClient, docId, 50)
 
   // Guard: if OCR was needed but produced no chunks, fail loudly so the user can retry
   if (allChunks.length === 0) {
@@ -186,6 +189,7 @@ async function processDocument(
 
   // Embed all chunks in one batched call
   const { embeddings, totalTokens: embeddingTokens } = await embedBatch(openai, allChunks.map(c => c.embed_content))
+  void setProgress(serviceClient, docId, 75)
 
   // Precompute content hashes for deduplication (same PDF re-uploaded → ON CONFLICT DO NOTHING)
   const contentHashes = await Promise.all(allChunks.map(c => sha256Hex(c.content)))
@@ -219,6 +223,7 @@ async function processDocument(
       error_message: null,
       embedding_tokens: embeddingTokens,
       ocr_tokens: ocrTokens,
+      progress_pct: 100,
     })
     .eq('id', docId)
 
@@ -424,6 +429,13 @@ function chunkSection(section: HierarchicalSection, isOcr: boolean, storagePath:
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function setProgress(client: any, docId: string, pct: number): Promise<void> {
+  try {
+    await client.from('ccr_documents').update({ progress_pct: pct }).eq('id', docId)
+  } catch { /* fire-and-forget — never block processing */ }
+}
 
 async function sha256Hex(text: string): Promise<string> {
   const encoded = new TextEncoder().encode(text)
