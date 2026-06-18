@@ -224,20 +224,26 @@ async function processMessage(
     // Embed all chunks in a single batched API call (OpenAI supports up to 2048 inputs)
     const embeddings = await embedBatch(openai, allChunks.map(c => c.embed_content))
 
-    // Bulk insert in batches
+    // Precompute content hashes for deduplication (same PDF re-uploaded → ON CONFLICT DO NOTHING)
+    const contentHashes = await Promise.all(allChunks.map(c => sha256Hex(c.content)))
+
+    // Bulk insert in batches — ignore duplicate chunks within the same document
     for (let i = 0; i < allChunks.length; i += INSERT_BATCH) {
       const batchChunks = allChunks.slice(i, i + INSERT_BATCH)
       const rows = batchChunks.map((chunk, j) => ({
         hoa_id,
         document_id,
         content: chunk.content,
+        content_hash: contentHashes[i + j],
         section_title: chunk.section_title,
         embedding: embeddings[i + j],
         chunk_index: chunk.chunk_index,
         metadata: chunk.metadata,
       }))
 
-      const { error: insertError } = await supabase.from('ccr_chunks').insert(rows)
+      const { error: insertError } = await supabase
+        .from('ccr_chunks')
+        .upsert(rows, { onConflict: 'document_id,content_hash', ignoreDuplicates: true })
       if (insertError) throw new Error(`Chunk insert failed: ${insertError.message}`)
     }
 
@@ -603,6 +609,14 @@ async function withRetry<T>(
 // Embedding — batched for efficiency
 // OpenAI supports up to 2048 inputs per call; embeddings are returned in input order.
 // ============================================================
+
+async function sha256Hex(text: string): Promise<string> {
+  const encoded = new TextEncoder().encode(text)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', encoded)
+  return Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
+}
 
 async function embedBatch(openai: OpenAI, texts: string[]): Promise<number[][]> {
   const MAX_BATCH = 2048

@@ -187,19 +187,25 @@ async function processDocument(
   // Embed all chunks in one batched call
   const { embeddings, totalTokens: embeddingTokens } = await embedBatch(openai, allChunks.map(c => c.embed_content))
 
-  // Bulk insert in batches of INSERT_BATCH
+  // Precompute content hashes for deduplication (same PDF re-uploaded → ON CONFLICT DO NOTHING)
+  const contentHashes = await Promise.all(allChunks.map(c => sha256Hex(c.content)))
+
+  // Bulk insert in batches of INSERT_BATCH — ignore duplicate chunks within the same document
   for (let i = 0; i < allChunks.length; i += INSERT_BATCH) {
     const batch = allChunks.slice(i, i + INSERT_BATCH)
     const rows = batch.map((chunk, j) => ({
       hoa_id: hoaId,
       document_id: docId,
       content: chunk.content,
+      content_hash: contentHashes[i + j],
       section_title: chunk.section_title,
       embedding: embeddings[i + j],
       chunk_index: chunk.chunk_index,
       metadata: chunk.metadata,
     }))
-    const { error: insertErr } = await serviceClient.from('ccr_chunks').insert(rows)
+    const { error: insertErr } = await serviceClient
+      .from('ccr_chunks')
+      .upsert(rows, { onConflict: 'document_id,content_hash', ignoreDuplicates: true })
     if (insertErr) throw new Error(`Chunk insert failed: ${insertErr.message}`)
   }
 
@@ -415,6 +421,16 @@ function chunkSection(section: HierarchicalSection, isOcr: boolean, storagePath:
 
   flush()
   return chunks
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+async function sha256Hex(text: string): Promise<string> {
+  const encoded = new TextEncoder().encode(text)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', encoded)
+  return Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
 }
 
 // ── Embedding ──────────────────────────────────────────────────────────────

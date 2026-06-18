@@ -147,7 +147,7 @@ export async function searchCCRs(
   // Rerank: Claude Haiku picks the most relevant chunks from the candidate set.
   const reranked = await rerankChunks(query, results, matchCount)
 
-  // Fire-and-forget analytics log — never blocks the search response
+  // Fire-and-forget analytics — never blocks the search response
   void (async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -155,7 +155,8 @@ export async function searchCCRs(
         ? reranked.reduce((sum, c) => sum + c.similarity, 0) / reranked.length
         : null
 
-      await supabase.from('rag_query_logs').insert({
+      // Capture returned id so chunk hits can reference this query log
+      const { data: logRow } = await supabase.from('rag_query_logs').insert({
         hoa_id: hoaId,
         user_id: user?.id ?? null,
         query_text: query,
@@ -163,7 +164,20 @@ export async function searchCCRs(
         top_section_title: reranked[0]?.section_title ?? null,
         avg_similarity: avgSimilarity !== null ? Number(avgSimilarity.toFixed(3)) : null,
         had_results: reranked.length > 0,
-      })
+      }).select('id').single()
+
+      // Log per-chunk hits for frequency/quality analysis
+      if (reranked.length > 0) {
+        await supabase.from('rag_chunk_hits').insert(
+          reranked.map((chunk, position) => ({
+            hoa_id: hoaId,
+            chunk_id: chunk.id,
+            query_log_id: logRow?.id ?? null,
+            rank_position: position,
+            similarity: Number(chunk.similarity.toFixed(4)),
+          }))
+        )
+      }
     } catch {
       // Analytics failures are silent — never impact search
     }
