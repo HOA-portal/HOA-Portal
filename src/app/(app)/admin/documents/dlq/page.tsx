@@ -36,10 +36,10 @@ export default async function DlqPage() {
     failed_at: string
     last_error: string | null
     retried_at: string | null
-    ccr_documents: { filename: string } | null
+    ccr_documents: { filename: string }[] | null
   }
 
-  const rows = (entries ?? []) as DlqEntry[]
+  const rows = (entries ?? []) as unknown as DlqEntry[]
 
   return (
     <div className="flex-1 overflow-auto">
@@ -74,7 +74,7 @@ export default async function DlqPage() {
 
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-slate-900 text-sm truncate">
-                        {entry.ccr_documents?.filename ?? `Document ${entry.document_id.slice(0, 8)}…`}
+                        {entry.ccr_documents?.[0]?.filename ?? `Document ${entry.document_id.slice(0, 8)}…`}
                       </p>
                       <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5 flex-wrap">
                         <span>{entry.read_ct} failed attempts</span>
